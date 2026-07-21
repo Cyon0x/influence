@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Influence — Escrow Influencer Marketplace</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Space+Grotesk:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --navy:     #14101C;
+  --navy2:    #1B1526;
+  --navy3:    #221A2E;
+  --surface:  #211A2E;
+  --surface2: #2C2138;
+  --border:   #3A2E42;
+  --border2:  rgba(255,107,53,0.25);
+  --violet:   #FF6B35;
+  --violet2:  #E85A2A;
+  --violetbg: rgba(255,107,53,0.12);
+  --mint:     #3ECF8E;
+  --mintdim:  rgba(62,207,142,0.12);
+  --mintbrd:  rgba(62,207,142,0.3);
+  --text:     #F7F1E8;
+  --muted:    #A79BB0;
+  --yellow:   #FFB86B;
+  --red:      #FF5C5C;
+  --green:    #3ECF8E;
+  --blue:     #6FA8DC;
+
+  --sunrise: linear-gradient(115deg, #1B1230 0%, #3D1F35 32%, #C8492E 68%, #FFB86B 100%);
+  --sunrise-text: linear-gradient(90deg, #FFB86B 0%, #FF8A5B 45%, #FF6B9D 100%);
+
+  --chrome-bg:     rgba(15,10,20,0.96);
+  --sidebar-solid: #0F0A16;
+  --card-accent:   #251C33;
+  --ghost-num:     rgba(255,107,53,0.22);
+  --grain-opacity: 0.035;
+  --scrim: rgba(0,0,0,0.72);
+}
+
+[data-theme="light"] {
+  --navy:     #FAF6EF;
+  --navy2:    #F3EBDC;
+  --navy3:    #EDE1CC;
+  --surface:  #FFFFFF;
+  --surface2: #FBF3E4;
+  --border:   #E5D8C2;
+  --border2:  rgba(200,73,46,0.22);
+  --violet:   #E8623A;
+  --violet2:  #C8492E;
+  --violetbg: rgba(232,98,58,0.1);
+  --mint:     #1F9D63;
+  --mintdim:  rgba(31,157,99,0.1);
+  --mintbrd:  rgba(31,157,99,0.28);
+  --text:     #241A2E;
+  --muted:    #8A7C74;
+  --yellow:   #B96A16;
+  --red:      #D33F3F;
+  --green:    #1F9D63;
+  --blue:     #3E76A8;
+
+  --chrome-bg:     rgba(255,255,255,0.92);
+  --sidebar-solid: #FFFFFF;
+  --card-accent:   #FBEFDD;
+  --ghost-num:     rgba(232,98,58,0.14);
+  --grain-opacity: 0.02;
+}
+[data-theme="light"] body { background: var(--navy); }
+[data-theme="light"] .sidebar,
+[data-theme="light"] .ticker-outer,
+[data-theme="light"] .topbar { border-color: var(--border); box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
+[data-theme="light"] .modal { box-shadow: 0 20px 60px rgba(20,16,28,0.18), 0 0 0 1px var(--border); }
+[data-theme="light"] .inf-card:hover { box-shadow: 0 10px 24px rgba(200,73,46,0.14); }
+[data-theme="light"] .nav-badge:not(.soon):not(.violet) { background: #3ECF8E; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--navy);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+  position: relative;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  z-index: 9998; pointer-events: none;
+  opacity: var(--grain-opacity); mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing: auto; }
+
+.ticker-outer {
+  position: fixed;
+  top: 0; left: 220px; right: 0;
+  z-index: 200;
+  overflow: hidden;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid rgba(255,107,53,0.2);
+  padding: 6px 0;
+  backdrop-filter: blur(8px);
+}
+.ticker-track {
+  display: flex;
+  gap: 3rem;
+  white-space: nowrap;
+  animation: ticker 35s linear infinite;
+  width: max-content;
+}
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+}
+.ticker-item .t-handle { color: var(--violet); font-weight: 600; }
+.ticker-item .t-count  { color: var(--mint); }
+.ticker-item .t-dot    { width: 4px; height: 4px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+
+.sidebar {
+  width: 220px;
+  background: var(--sidebar-solid);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: fixed;
+  top: 0; left: 0;
+  flex-shrink: 0;
+  z-index: 300;
+}
+.sidebar-logo {
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.sidebar-close {
+  display: none;
+  margin-left: auto;
+  background: none; border: none; color: var(--muted);
+  font-size: 16px; cursor: pointer; padding: 6px; line-height: 1;
+  flex-shrink: 0;
+}
+.logo-mark {
+  width: 36px; height: 36px; flex-shrink: 0; position: relative;
+}
+.logo-mark svg { width: 100%; height: 100%; display: block; }
+.logo-text { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
+.logo-text span { color: var(--mint); }
+.logo-sub { font-size: 9px; color: var(--muted); margin-top: 1px; letter-spacing: 0.02em; }
+
+.sidebar-nav { flex: 1; padding: 12px 8px; overflow-y: auto; }
+.nav-label { font-size: 10px; font-weight: 700; color: var(--muted); padding: 4px 12px 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px;
+  font-size: 13px; color: var(--muted);
+  cursor: pointer; transition: all 0.12s;
+  border-left: 2px solid transparent;
+  margin-bottom: 2px; user-select: none;
+}
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--violetbg); color: var(--violet); border-left-color: var(--violet); font-weight: 600; }
+.nav-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--mint); color: #14101C; margin-left: auto; }
+.nav-badge.soon { background: var(--border); color: var(--muted); }
+.nav-badge.violet { background: var(--violet); color: #fff; }
+.sidebar-divider { height: 1px; background: var(--border); margin: 10px 4px; }
+
+.sidebar-bottom { padding: 10px 8px; border-top: 1px solid var(--border); }
+.arc-pill {
+  background: var(--mintdim);
+  border: 1px solid var(--mintbrd);
+  border-radius: 10px; padding: 9px 12px; margin-bottom: 8px;
+}
+.arc-pill-top { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); animation: pulse 2s infinite; flex-shrink: 0; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+.user-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; }
+.user-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--mint), #0EA5E9);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0; color: #14101C;
+}
+
+.main {
+  flex: 1;
+  margin-left: 220px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 24px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 31px;
+  z-index: 150;
+  backdrop-filter: blur(8px);
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.topbar-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 16px; letter-spacing: -0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.hamburger-btn {
+  display: none;
+  flex-direction: column; justify-content: center; gap: 4px;
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; flex-shrink: 0; padding: 0;
+}
+.hamburger-btn span { width: 16px; height: 2px; background: var(--text); margin: 0 auto; border-radius: 2px; }
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 290;
+}
+.sidebar-overlay.show { display: block; }
+.theme-toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; font-size: 15px; flex-shrink: 0; padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover { background: var(--surface2); }
+.wallet-chip {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 6px 12px;
+  font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted);
+  cursor: pointer;
+}
+.connect-btn {
+  background: var(--violet); border: none; color: #fff;
+  padding: 7px 16px; border-radius: 8px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+}
+.connect-btn:hover { background: var(--violet2); }
+.connect-btn:disabled { opacity: 0.6; cursor: wait; }
+
+.network-banner {
+  display: none;
+  align-items: center; justify-content: space-between; gap: 12px;
+  background: rgba(255,92,92,0.12); border-bottom: 1px solid rgba(255,92,92,0.3);
+  color: var(--red); font-size: 12px; font-weight: 600;
+  padding: 8px 24px;
+}
+.network-banner.show { display: flex; }
+.network-banner button {
+  background: var(--red); color: #fff; border: none; border-radius: 6px;
+  padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.content { flex: 1; overflow-y: auto; padding: 28px 24px; background: var(--navy2); margin-top: 31px; }
+
+.page-header {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 140% at 12% 128%, rgba(255,184,107,0.4) 0%, rgba(255,184,107,0) 42%),
+    linear-gradient(158deg, #1B1230 0%, #2E1B3D 38%, #7A2E3D 68%, #C8492E 92%, #E07B3E 100%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px 30px;
+  margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px;
+}
+.page-header::after {
+  content: '';
+  position: absolute;
+  left: -6%; bottom: -62%;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #FFD8A6 0%, #FFB86B 32%, #E8623A 62%, rgba(232,98,58,0) 78%);
+  filter: blur(2px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.page-header > * { position: relative; z-index: 1; }
+.page-header h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; letter-spacing: -0.4px; margin-bottom: 8px; }
+.page-header p { font-size: 13px; color: rgba(247,241,232,0.72); max-width: 500px; line-height: 1.65; }
+.beta-tag {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px; font-weight: 700; color: #FBF4EA;
+  background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.2);
+  padding: 3px 10px; border-radius: 20px; margin-left: 8px;
+}
+.stats-row { display: flex; gap: 26px; flex-wrap: wrap; }
+.stat-chip .val { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 600; color: #FBF4EA; }
+.stat-chip .val span { color: #FFD8A6; }
+.stat-chip .lbl { font-size: 10px; color: rgba(247,241,232,0.6); margin-top: 2px; letter-spacing: 0.02em; }
+
+.tab-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab-btn {
+  padding: 9px 20px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted);
+  font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+}
+.tab-btn.active { background: var(--violet); color: #fff; border-color: var(--violet); }
+.tab-btn:hover:not(.active) { border-color: var(--violet); color: var(--violet); }
+
+.register-banner {
+  background: linear-gradient(135deg, #2E1B3D, #3D2418);
+  border: 1px solid var(--border2);
+  border-radius: 14px; padding: 20px 24px;
+  margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+.register-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, var(--violet), #FFB86B);
+  border: none; border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: #fff;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  white-space: nowrap; transition: opacity 0.15s;
+}
+.register-btn:hover { opacity: 0.9; }
+
+.filter-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+.filter-select {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 14px;
+  color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif;
+  outline: none; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--mint); }
+.search-input {
+  flex: 1; min-width: 200px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 14px;
+  color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none;
+}
+.search-input:focus { border-color: var(--mint); }
+.search-input::placeholder { color: var(--muted); }
+
+.pill-row { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.pill {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 5px 14px; border-radius: 100px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+}
+.pill.active, .pill:hover {
+  background: var(--violetbg); border-color: var(--violet); color: var(--text);
+}
+
+.influencer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+.inf-card {
+  background: linear-gradient(175deg, var(--card-accent) 0%, var(--surface) 14%);
+  border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  cursor: pointer; position: relative;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+}
+.inf-card:hover { border-color: var(--violet); transform: translateY(-3px); box-shadow: 0 10px 28px rgba(200,73,46,0.22); }
+.inf-card.featured { border-color: rgba(62,207,142,0.35); }
+.inf-card.featured:hover { border-color: var(--mint); box-shadow: 0 10px 28px rgba(62,207,142,0.2); }
+
+.top-tag {
+  position: absolute; top: 0; left: 14px;
+  background: linear-gradient(120deg, #3ECF8E, #2FAE75); color: #14101C;
+  font-size: 9px; font-weight: 800; padding: 3px 10px;
+  border-radius: 0 0 8px 8px; letter-spacing: 0.04em;
+}
+
+.inf-card-top { padding: 18px 18px 12px; }
+.inf-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.inf-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.inf-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.inf-location { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.local-time-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+  color: var(--yellow); background: rgba(255,184,107,0.1);
+  border: 1px solid rgba(255,184,107,0.22);
+  padding: 1px 7px; border-radius: 100px; line-height: 1.6;
+}
+.verified {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9px; font-weight: 700; color: var(--mint);
+  background: var(--mintdim); padding: 2px 6px; border-radius: 20px;
+}
+.inf-bio { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.platform-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.platform-badge {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 6px;
+  font-size: 10px; font-weight: 600;
+  background: #3A2E42; color: var(--muted);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all 0.15s; text-decoration: none;
+}
+.platform-badge:hover { border-color: var(--mint); color: var(--mint); }
+.platform-badge .count { color: var(--text); font-weight: 700; }
+
+.rating-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.stars { color: var(--yellow); font-size: 12px; letter-spacing: 1px; }
+.rating-score { font-size: 12px; font-weight: 700; color: var(--text); }
+.rating-count { font-size: 11px; color: var(--muted); }
+.niche-tag {
+  display: inline-block;
+  background: var(--violetbg); color: #FFB37A;
+  font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 100px;
+  margin-bottom: 8px;
+}
+
+.inf-card-bottom {
+  padding: 12px 18px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.inf-rate { font-size: 15px; font-weight: 800; color: var(--mint); font-family: 'DM Mono', monospace; }
+.inf-rate-label { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.hire-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--violet), #FFB86B);
+  border: none; border-radius: 8px;
+  font-size: 12px; font-weight: 700; color: #fff;
+  cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s;
+}
+.hire-btn:hover { opacity: 0.9; }
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(4px);
+  z-index: 500; display: none;
+  align-items: center; justify-content: center; padding: 1rem;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface); border-radius: 18px;
+  width: 100%; max-width: 580px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px var(--border);
+}
+.modal-header {
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between;
+  position: sticky; top: 0; background: var(--surface);
+  border-radius: 18px 18px 0 0; z-index: 1;
+}
+.modal-body { padding: 24px; }
+.close-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border); background: #3A2E42;
+  cursor: pointer; font-size: 18px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.escrow-box { background: var(--navy2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.escrow-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.escrow-step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.escrow-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--violet); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.escrow-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.escrow-text strong { color: var(--text); }
+
+.fee-box { background: var(--violetbg); border: 1px solid rgba(255,107,53,0.25); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.fee-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 13px; }
+.fee-row.total { border-top: 1px solid rgba(255,107,53,0.2); margin-top: 6px; padding-top: 10px; font-weight: 700; }
+.fee-label { color: var(--muted); }
+.fee-val { font-family: 'DM Mono', monospace; font-weight: 600; }
+
+.reviews-section { margin-bottom: 16px; }
+.review-item { background: var(--navy2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.review-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.reviewer-name { font-size: 12px; font-weight: 700; }
+.review-stars { color: var(--yellow); font-size: 11px; }
+.review-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.review-date { font-size: 10px; color: var(--muted); margin-top: 4px; opacity: 0.6; }
+
+.proof-box { background: var(--navy2); border: 1px dashed rgba(62,207,142,0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.proof-title { font-size: 11px; font-weight: 700; color: var(--mint); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+
+.brief-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; resize: vertical; min-height: 80px; margin-bottom: 12px; transition: border-color 0.15s; }
+.brief-input:focus { border-color: var(--violet); }
+.brief-input::placeholder { color: var(--muted); }
+
+.pay-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--violet), #FFB86B); border: none; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; font-family: 'DM Sans', sans-serif; box-shadow: 0 4px 20px rgba(255,107,53,0.3); transition: all 0.15s; }
+.pay-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.pay-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.pay-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 10px; line-height: 1.6; }
+
+.form-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; display: block; }
+.form-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; margin-bottom: 14px; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--violet); }
+.form-input::placeholder { color: var(--muted); }
+.form-select { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; margin-bottom: 14px; cursor: pointer; }
+.upload-area { border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 16px; }
+.upload-area:hover { border-color: var(--violet); }
+.social-link-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.social-icon { width: 32px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.social-input { flex: 1; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; }
+.social-input:focus { border-color: var(--violet); }
+.social-input::placeholder { color: var(--muted); }
+.follower-input { width: 90px; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; color: var(--mint); font-size: 12px; font-family: 'DM Mono', monospace; outline: none; text-align: center; }
+
+.deals-empty { padding: 56px 24px; text-align: center; color: var(--muted); }
+.deals-empty .emoji { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+
+.deal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 14px; }
+.deal-card.pending-proof { border-color: rgba(255,184,107,0.35); }
+.deal-card.awaiting-brand { border-color: rgba(255,107,53,0.4); }
+.deal-card.completed      { border-color: rgba(62,207,142,0.4); }
+.deal-card.cancelled      { border-color: rgba(167,155,176,0.4); opacity: 0.75; }
+
+.deal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.deal-creator-info { display: flex; align-items: center; gap: 10px; }
+.deal-status-badge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 100px; letter-spacing: 0.04em; }
+.deal-status-badge.in-progress   { background: rgba(255,184,107,0.15); color: var(--yellow); border: 1px solid rgba(255,184,107,0.3); }
+.deal-status-badge.proof-pending { background: var(--violetbg); color: #FFB37A; border: 1px solid var(--border2); }
+.deal-status-badge.awaiting-ack  { background: rgba(111,168,220,0.12); color: var(--blue); border: 1px solid rgba(111,168,220,0.3); }
+.deal-status-badge.completed     { background: var(--mintdim); color: var(--mint); border: 1px solid var(--mintbrd); }
+.deal-status-badge.cancelled     { background: rgba(167,155,176,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+.deal-body { padding: 18px 20px; }
+.deal-brief-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+.deal-brief-text { font-size: 13px; color: var(--text); line-height: 1.55; margin-bottom: 16px; }
+
+.proof-upload-panel { background: var(--navy2); border: 1px dashed rgba(255,184,107,0.4); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.proof-upload-title { font-size: 11px; font-weight: 700; color: var(--yellow); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+.proof-upload-input { width: 100%; background: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; margin-bottom: 10px; }
+.proof-upload-input:focus { border-color: var(--yellow); }
+.proof-upload-input::placeholder { color: var(--muted); }
+
+.proof-submitted-panel { background: rgba(111,168,220,0.06); border: 1px solid rgba(111,168,220,0.25); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.proof-submitted-title { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+.proof-submitted-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 6px; line-height: 1.5; }
+.proof-submitted-item strong { color: var(--text); }
+
+.completed-panel { background: var(--mintdim); border: 1px solid var(--mintbrd); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+.completed-icon { font-size: 24px; flex-shrink: 0; }
+.completed-title { font-size: 13px; font-weight: 700; color: var(--mint); margin-bottom: 2px; }
+.completed-sub { font-size: 11px; color: var(--muted); }
+
+.rating-input { display: flex; gap: 6px; margin-bottom: 12px; }
+.rating-input .star-btn { font-size: 22px; cursor: pointer; color: var(--border); background: none; border: none; padding: 0; transition: color 0.1s; }
+.rating-input .star-btn.on { color: var(--yellow); }
+
+.btn-mark-complete {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, var(--yellow), #E8623A);
+  border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 700; color: #14101C;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 4px 18px rgba(255,184,107,0.3);
+  transition: all 0.15s;
+}
+.btn-mark-complete:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-mark-complete:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-acknowledge {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, var(--mint), #2FAE75);
+  border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 700; color: #14101C;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 4px 18px rgba(62,207,142,0.25);
+  transition: all 0.15s;
+}
+.btn-acknowledge:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-acknowledge:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-secondary-line {
+  width: 100%; padding: 10px; margin-top: 8px;
+  background: transparent; border: 1px solid var(--border); border-radius: 10px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+}
+.btn-secondary-line:hover { border-color: var(--red); color: var(--red); }
+.btn-secondary-line.auto { border-color: var(--mintbrd); color: var(--mint); }
+.btn-secondary-line.auto:hover { background: var(--mintdim); }
+
+.deal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.deal-amount { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 700; color: var(--mint); }
+.deal-amount-label { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.deal-timer { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.deal-timer .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); animation: pulse 2s infinite; }
+
+.role-switcher { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; flex-wrap: wrap; }
+.role-switcher-label { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.role-btn { padding: 5px 14px; border-radius: 100px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.role-btn.active { background: var(--violetbg); border-color: var(--violet); color: var(--text); }
+
+.toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 20px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 600; color: var(--text);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 9999; transition: transform 0.3s ease;
+  max-width: min(90vw, 420px);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast-icon { font-size: 16px; flex-shrink: 0; }
+.toast a { color: var(--mint); }
+
+.how-section { margin-top: 8px; }
+.how-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 24px; }
+.how-card { background: var(--navy2); padding: 20px 16px; }
+.how-num { font-family: 'Fraunces', serif; font-size: 2.1rem; font-weight: 600; color: var(--ghost-num); line-height: 1; margin-bottom: 10px; }
+.how-icon { font-size: 20px; margin-bottom: 8px; }
+.how-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.how-desc { font-size: 11px; color: var(--muted); line-height: 1.55; }
+.how-arc { display: inline-flex; align-items: center; gap: 4px; background: var(--mintdim); border: 1px solid var(--mintbrd); color: var(--mint); font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 100px; margin-top: 6px; }
+
+.pipeline-box { position: relative; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 18px; padding: 46px 28px 30px; margin-bottom: 24px; overflow: hidden; }
+.pipeline-arc-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.pipeline-inner { display: flex; align-items: flex-end; justify-content: center; gap: 0; flex-wrap: nowrap; position: relative; z-index: 1; overflow-x: auto; padding-bottom: 4px; }
+.pipe-step { display: flex; flex-direction: column; align-items: center; text-align: center; width: 128px; flex-shrink: 0; transition: transform 0.2s; }
+.pipe-step:nth-child(1) { transform: translateY(0); }
+.pipe-step:nth-child(2) { transform: translateY(-26px); }
+.pipe-step:nth-child(3) { transform: translateY(-42px); }
+.pipe-step:nth-child(4) { transform: translateY(-22px); }
+.pipe-step:nth-child(5) { transform: translateY(2px); }
+.pipe-dot {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; margin-bottom: 10px; border: 1px solid;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+.pipe-dot.brand  { background: linear-gradient(150deg, #2E1B3D, #7A2E3D); border-color: rgba(255,107,53,0.4); }
+.pipe-dot.escrow { background: linear-gradient(150deg, #7A2E3D, #C8492E); border-color: rgba(255,184,107,0.45); }
+.pipe-dot.inf    { background: linear-gradient(150deg, #C8492E, #FFB86B); border-color: rgba(255,184,107,0.55); }
+.pipe-dot.check  { background: linear-gradient(150deg, #2FAE75, #3ECF8E); border-color: var(--mintbrd); }
+.pipe-lbl { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 600; color: var(--text); }
+.pipe-sub { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.3; max-width: 110px; }
+.pipeline-note { text-align: center; margin-top: 28px; font-size: 12px; color: var(--muted); position: relative; z-index: 1; }
+.pipeline-note strong { color: var(--mint); }
+@media (max-width: 720px) {
+  .pipe-step:nth-child(n) { transform: none; }
+  .pipeline-box { padding: 24px 20px; }
+}
+
+@media (max-width: 880px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    width: 260px;
+    box-shadow: 8px 0 32px rgba(0,0,0,0.4);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-close { display: block; }
+  .hamburger-btn { display: flex; }
+  .main { margin-left: 0; }
+  .ticker-outer { left: 0; }
+}
+
+@media (max-width: 960px) {
+  .influencer-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .how-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .content { padding-left: 16px; padding-right: 16px; }
+  .topbar { padding: 10px 14px; }
+  .topbar-title { font-size: 14px; }
+  .wallet-chip { display: none; }
+  .connect-btn { padding: 7px 12px; font-size: 11px; }
+
+  .page-header { padding: 22px 18px; border-radius: 14px; }
+  .page-header h1 { font-size: 21px; }
+  .page-header p { font-size: 12.5px; }
+  .stats-row { gap: 18px; }
+  .stat-chip .val { font-size: 19px; }
+  .page-header::after { width: 150px; height: 150px; }
+
+  .influencer-grid { grid-template-columns: 1fr; }
+  .how-grid { grid-template-columns: 1fr 1fr; }
+
+  .filter-row { flex-direction: column; align-items: stretch; }
+  .filter-row > * { width: 100%; }
+
+  .register-banner { flex-direction: column; align-items: flex-start; }
+  .register-banner button { width: 100%; }
+
+  .role-switcher { flex-wrap: wrap; }
+
+  .deal-header, .deal-footer { flex-direction: column; align-items: flex-start; }
+
+  .modal { max-height: 94vh; border-radius: 16px; }
+  .modal-header, .modal-body { padding: 16px; }
+
+  .pipe-step { width: 96px; }
+  .pipe-dot { width: 44px; height: 44px; font-size: 16px; }
+  .pipe-sub { font-size: 9.5px; max-width: 90px; }
+
+  .toast { left: 16px; right: 16px; transform: translateY(80px); white-space: normal; text-align: center; }
+  .toast.show { transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<div class="ticker-outer">
+  <div class="ticker-track" id="tickerTrack"></div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="logoGrad" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#241735"/>
+            <stop offset="55%" stop-color="#C8492E"/>
+            <stop offset="100%" stop-color="#FFB86B"/>
+          </linearGradient>
+        </defs>
+        <rect x="2" y="2" width="60" height="60" rx="17" fill="url(#logoGrad)"/>
+        <text x="32" y="42" text-anchor="middle" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="26" fill="#FBF4EA" letter-spacing="-1">IN</text>
+        <circle cx="49" cy="17" r="2.6" fill="#3ECF8E"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">Influence<span>.</span></div>
+      <div class="logo-sub">Escrow marketplace &middot; Arc</div>
+    </div>
+    <button class="sidebar-close" id="sidebarClose" onclick="closeSidebar()" aria-label="Close menu">✕</button>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-label">Marketplace</div>
+    <div class="nav-item active" onclick="switchNav(this,'marketplace')">🔍 <span style="flex:1">Find Creators</span><span class="nav-badge violet">LIVE</span></div>
+    <div class="nav-item" onclick="switchNav(this,'how')">⚡ <span>How it works</span></div>
+    <div class="nav-item" onclick="switchNav(this,'register')">✦ <span>Join as Creator</span></div>
+    <div class="nav-item" onclick="switchNav(this,'deals')">📋 <span style="flex:1">My Deals</span><span class="nav-badge" id="dealsNavBadge" style="display:none;">0</span></div>
+  </div>
+  <div class="sidebar-bottom">
+    <div class="arc-pill">
+      <div class="arc-pill-top">
+        <div class="live-dot"></div>
+        <span style="font-size:11px;font-weight:600;color:var(--mint);">Arc Testnet</span>
+      </div>
+      <div style="font-size:10px;color:var(--muted);">Native USDC · Chain ID 5042002</div>
+    </div>
+    <div class="user-row" id="sidebarUserRow" style="display:none;">
+      <div class="user-avatar" id="sidebarUserAvatar">·</div>
+      <span style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;" id="sidebarUserAddr"></span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="network-banner" id="networkBanner">
+    <span>⚠️ Wrong network — switch your wallet to Arc Testnet to use Influence.</span>
+    <button onclick="switchToArcTestnet()">Switch network</button>
+  </div>
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" id="hamburgerBtn" onclick="openSidebar()" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="topbar-title">Influence <span style="color:var(--muted);font-weight:400;" class="topbar-subtitle">— Escrow Marketplace</span></div>
+    </div>
+    <div class="topbar-right">
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode">
+        <span class="theme-icon">🌙</span>
+      </button>
+      <div class="wallet-chip" id="walletChip" style="display:none;" onclick="openExplorerForAddress()"><div class="live-dot"></div><span class="wallet-addr" id="walletAddr"></span></div>
+      <button class="connect-btn" id="connectBtn" onclick="onConnectClick()">Connect Wallet</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div id="view-marketplace">
+
+      <div class="page-header">
+        <div>
+          <h1>Find creators <span class="beta-tag">LIVE ON ARC</span></h1>
+          <p>Every creator's clock below is real — that's the point. Lock USDC in escrow, approve the work, and it lands in their wallet the same day, whatever time it is where they are.</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-chip"><div class="val" id="statCreatorCount">–</div><div class="lbl">Active creators</div></div>
+          <div class="stat-chip"><div class="val" id="statPaidOut">–</div><div class="lbl">USDC paid out</div></div>
+          <div class="stat-chip"><div class="val">1<span>%</span></div><div class="lbl">Platform fee only</div></div>
+        </div>
+      </div>
+
+      <div class="register-banner">
+        <div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Are you a creator? 🌿</div>
+          <div style="font-size:13px;color:var(--muted);">List your profile, set your rate, and get paid in USDC directly to your wallet on Arc.</div>
+        </div>
+        <button class="register-btn" onclick="switchNavById('register')">List my profile →</button>
+      </div>
+
+      <div class="filter-row">
+        <input class="search-input" type="text" id="searchInput" placeholder="🔍  Search by name, handle, or niche..." oninput="renderMarketplace()" />
+        <select class="filter-select" id="filterPlatform" onchange="renderMarketplace()">
+          <option value="">All platforms</option>
+          <option>Twitter</option>
+          <option>TikTok</option>
+          <option>Instagram</option>
+          <option>YouTube</option>
+          <option>Facebook</option>
+          <option>LinkedIn</option>
+        </select>
+        <select class="filter-select" id="filterNiche" onchange="renderMarketplace()">
+          <option value="">All niches</option>
+        </select>
+        <select class="filter-select" id="filterBudget" onchange="renderMarketplace()">
+          <option value="">Any budget</option>
+          <option value="0-100">Under 100 USDC</option>
+          <option value="100-500">100–500 USDC</option>
+          <option value="500-999999999">500+ USDC</option>
+        </select>
+      </div>
+
+      <div class="pill-row" id="pillRow">
+        <div class="pill active" data-pill="all">All</div>
+        <div class="pill" data-pill="1m">1M+ followers</div>
+        <div class="pill" data-pill="100k-1m">100K–1M</div>
+        <div class="pill" data-pill="10k-100k">10K–100K</div>
+        <div class="pill" data-pill="micro">Micro (&lt;10K)</div>
+        <div class="pill" data-pill="top">Top rated ★</div>
+        <div class="pill" data-pill="verified">Verified only</div>
+      </div>
+
+      <div class="influencer-grid" id="influencerGrid">
+        <div class="deals-empty" style="grid-column:1/-1;"><div class="emoji">⏳</div>Loading creators from Arc testnet…</div>
+      </div>
+    </div>
+
+    <div id="view-how" style="display:none;">
+      <div class="page-header">
+        <div>
+          <h1>How Influence works</h1>
+          <p>Every deal is backed by native USDC escrow on Arc. Funds release only when work is confirmed — protecting both brands and creators.</p>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Step by step</div>
+      <div class="how-grid">
+        <div class="how-card"><div class="how-num">01</div><div class="how-icon">🔍</div><div class="how-title">Brand finds creator</div><div class="how-desc">Browse profiles ranked by followers. Filter by niche, platform, or rate. Direct outreach or choose from posted gigs.</div></div>
+        <div class="how-card"><div class="how-num">02</div><div class="how-icon">📋</div><div class="how-title">Deal is agreed</div><div class="how-desc">Brand and creator agree on scope, deliverables, and rate. Terms are recorded on-chain in the brief.</div></div>
+        <div class="how-card"><div class="how-num">03</div><div class="how-icon">🔒</div><div class="how-title">USDC locked</div><div class="how-desc">Brand deposits native USDC into the Arc smart contract. Funds are locked until the job is complete.<br/><span class="how-arc">Arc Testnet</span></div></div>
+        <div class="how-card"><div class="how-num">04</div><div class="how-icon">📣</div><div class="how-title">Creator delivers</div><div class="how-desc">Creator completes the promotion and submits proof — a link, screenshot description, or engagement metrics.</div></div>
+        <div class="how-card"><div class="how-num">05</div><div class="how-icon">✅</div><div class="how-title">Brand approves</div><div class="how-desc">Brand reviews proof and approves. 48-hour auto-release to the creator if there's no response.</div></div>
+        <div class="how-card"><div class="how-num">06</div><div class="how-icon">💸</div><div class="how-title">Creator gets paid</div><div class="how-desc">USDC lands in the creator's wallet instantly. Platform retains 1% of the deal. Reviews posted on-chain.<br/><span class="how-arc">1% fee only</span></div></div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;">Escrow flow</div>
+      <div class="pipeline-box">
+        <svg class="pipeline-arc-svg" viewBox="0 0 900 220" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#7A2E3D"/>
+              <stop offset="45%" stop-color="#C8492E"/>
+              <stop offset="75%" stop-color="#FFB86B"/>
+              <stop offset="100%" stop-color="#3ECF8E"/>
+            </linearGradient>
+          </defs>
+          <path d="M 70 180 C 220 60, 320 40, 450 40 C 580 40, 680 70, 830 165" fill="none" stroke="url(#arcGrad)" stroke-width="1.5" stroke-dasharray="2 8" stroke-linecap="round" opacity="0.55"/>
+        </svg>
+        <div class="pipeline-inner">
+          <div class="pipe-step">
+            <div class="pipe-dot brand">🏢</div>
+            <div class="pipe-lbl">Brand</div>
+            <div class="pipe-sub">Deposits USDC</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-dot escrow">🔒</div>
+            <div class="pipe-lbl">Escrow</div>
+            <div class="pipe-sub">Holds on Arc</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-dot inf">📣</div>
+            <div class="pipe-lbl">Creator</div>
+            <div class="pipe-sub">Delivers &amp; submits proof</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-dot brand">👍</div>
+            <div class="pipe-lbl">Approval</div>
+            <div class="pipe-sub">Brand reviews, or 48h auto-release</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-dot check">✅</div>
+            <div class="pipe-lbl">Released</div>
+            <div class="pipe-sub">99% creator · 1% platform</div>
+          </div>
+        </div>
+        <div class="pipeline-note">All payments in <strong>native USDC</strong> on <strong>Arc Testnet</strong> · Chain ID 5042002 · Circle stablecoin infrastructure</div>
+      </div>
+    </div>
+
+    <div id="view-register" style="display:none;max-width:640px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;">
+        <div style="font-size:17px;font-weight:800;margin-bottom:4px;font-family:'Space Grotesk',sans-serif;">Create your creator profile</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:24px;">Brands will see this when browsing Influence. This writes your profile on-chain to the CreatorRegistry contract, using your connected wallet.</div>
+
+        <label class="form-label">Full name</label>
+        <input class="form-input" type="text" id="regName" placeholder="Your name" />
+
+        <label class="form-label">Location</label>
+        <input class="form-input" type="text" id="regLocation" placeholder="e.g. Lagos, Manila, Nairobi" />
+
+        <label class="form-label">UTC offset (for your local-time badge)</label>
+        <input class="form-input" type="number" step="0.5" id="regTz" placeholder="e.g. 1 for Lagos, 8 for Manila, -5 for New York" />
+
+        <label class="form-label">Bio</label>
+        <textarea class="brief-input" id="regBio" placeholder="Tell brands about yourself, your audience, and the content you create..."></textarea>
+
+        <label class="form-label">Niche</label>
+        <select class="form-select" id="regNiche">
+          <option value="">Select your niche</option>
+          <option>Fashion</option>
+          <option>Food</option>
+          <option>Fitness</option>
+          <option>Tech & Web3</option>
+          <option>Finance</option>
+          <option>Beauty</option>
+          <option>Comedy</option>
+          <option>Travel & Lifestyle</option>
+          <option>Business</option>
+          <option>Other</option>
+        </select>
+
+        <label class="form-label">Social media accounts</label>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Paste your profile links — brands can click to verify your following</div>
+
+        <div class="social-link-row">
+          <div class="social-icon" style="background:#E91E8C20;">📸</div>
+          <input class="social-input" type="text" id="socInstagram" placeholder="instagram.com/yourhandle" />
+          <input class="follower-input" type="text" id="socInstagramCount" placeholder="Followers" />
+        </div>
+        <div class="social-link-row">
+          <div class="social-icon" style="background:#01010120;">🎵</div>
+          <input class="social-input" type="text" id="socTiktok" placeholder="tiktok.com/@yourhandle" />
+          <input class="follower-input" type="text" id="socTiktokCount" placeholder="Followers" />
+        </div>
+        <div class="social-link-row">
+          <div class="social-icon" style="background:#FF000020;">▶</div>
+          <input class="social-input" type="text" id="socYoutube" placeholder="youtube.com/@yourchannel" />
+          <input class="follower-input" type="text" id="socYoutubeCount" placeholder="Subscribers" />
+        </div>
+        <div class="social-link-row">
+          <div class="social-icon" style="background:#00000020;">𝕏</div>
+          <input class="social-input" type="text" id="socTwitter" placeholder="x.com/yourhandle" />
+          <input class="follower-input" type="text" id="socTwitterCount" placeholder="Followers" />
+        </div>
+
+        <label class="form-label" style="margin-top:14px;">Your rate (USDC per post)</label>
+        <div style="position:relative;margin-bottom:6px;">
+          <input class="form-input" type="text" placeholder="100" style="padding-right:60px;margin-bottom:0;" id="rateInput" oninput="updateRatePreview(this.value)" />
+          <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;color:var(--mint);">USDC</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:20px;">You'll receive <strong id="ratePreview" style="color:var(--text);">99.00 USDC</strong> per deal after the 1% Influence fee</div>
+
+        <button class="pay-btn" id="registerSubmitBtn" onclick="submitRegisterProfile()">✦ Submit profile on-chain →</button>
+        <div class="pay-note">Requires your wallet to be connected on Arc Testnet. This writes directly to the CreatorRegistry contract.</div>
+      </div>
+    </div>
+
+    <div id="view-deals" style="display:none;">
+
+      <div class="page-header" style="margin-bottom:20px;">
+        <div>
+          <h1>My Deals</h1>
+          <p>Track active and completed deals. Creators submit proof — brands release funds from escrow.</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-chip"><div class="val" id="statActive">0</div><div class="lbl">Active</div></div>
+          <div class="stat-chip"><div class="val" id="statCompleted">0</div><div class="lbl">Completed</div></div>
+          <div class="stat-chip"><div class="val">$<span id="statLocked">0</span></div><div class="lbl">USDC in escrow</div></div>
+        </div>
+      </div>
+
+      <div class="role-switcher" id="roleSwitcher">
+        <span class="role-switcher-label">Show:</span>
+        <button class="role-btn active" data-filter="all" onclick="setDealFilter('all')">All</button>
+        <button class="role-btn" data-filter="brand" onclick="setDealFilter('brand')">🏢 As Brand</button>
+        <button class="role-btn" data-filter="creator" onclick="setDealFilter('creator')">🎙️ As Creator</button>
+      </div>
+
+      <div id="dealsContainer">
+        <div class="deals-empty"><div class="emoji">🔌</div>Connect your wallet to see your deals.</div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="hireModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="modalAvatar" class="inf-avatar" style="width:36px;height:36px;font-size:14px;flex-shrink:0;"></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:16px;font-weight:600;font-family:'Fraunces',serif;" id="modalName"></span>
+            <span class="verified" id="modalVerifiedBadge" style="display:none;">✓ Verified</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="modalSub"></div>
+        </div>
+      </div>
+      <button class="close-btn" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--navy2);border:1px solid var(--border);border-radius:10px;">
+        <div class="stars" id="modalStars" style="font-size:14px;"></div>
+        <span style="font-size:13px;font-weight:700;" id="modalRating"></span>
+        <span style="font-size:12px;color:var(--muted);" id="modalDeals"></span>
+        <div style="margin-left:auto;font-size:11px;font-weight:600;color:var(--muted);font-family:'DM Mono',monospace;" id="modalAddr"></div>
+      </div>
+
+      <div class="fee-box">
+        <div style="font-size:12px;font-weight:700;color:var(--violet);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">Payment breakdown</div>
+        <div class="fee-row">
+          <span class="fee-label">Amount to lock in escrow</span>
+          <span class="fee-val" id="modalTotal"></span>
+        </div>
+        <div class="fee-row">
+          <span class="fee-label">Creator receives on release (99%)</span>
+          <span class="fee-val" id="modalBaseRate"></span>
+        </div>
+        <div class="fee-row total">
+          <span style="color:var(--text);">Influence fee (1%)</span>
+          <span class="fee-val" style="color:var(--violet);" id="modalFee"></span>
+        </div>
+      </div>
+
+      <div class="escrow-box">
+        <div class="escrow-title">How escrow works</div>
+        <div class="escrow-step">
+          <div class="escrow-dot">1</div>
+          <div class="escrow-text"><strong id="modalEscrow1"></strong> — locked in the Arc smart contract. Nobody can touch it yet.</div>
+        </div>
+        <div class="escrow-step">
+          <div class="escrow-dot">2</div>
+          <div class="escrow-text"><strong>Creator does the work</strong> and submits proof (a link or description of the deliverable).</div>
+        </div>
+        <div class="escrow-step">
+          <div class="escrow-dot">3</div>
+          <div class="escrow-text"><strong>You approve</strong> — contract releases funds to the creator. Influence retains 1%.</div>
+        </div>
+        <div class="escrow-step" style="margin-bottom:0;">
+          <div class="escrow-dot" style="background:var(--yellow);">!</div>
+          <div class="escrow-text"><strong>48-hour protection</strong> — if you don't respond within 48 hours of proof being submitted, anyone can trigger auto-release to the creator.</div>
+        </div>
+      </div>
+
+      <div class="reviews-section">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Recent reviews</div>
+        <div id="modalReviews"></div>
+      </div>
+
+      <label class="form-label">Job brief</label>
+      <textarea class="brief-input" id="modalBrief" placeholder="Describe what you want promoted, the deliverable, deadline, and any other requirements..."></textarea>
+
+      <button class="pay-btn" id="modalPayBtn">⚡ Lock USDC in Escrow →</button>
+      <div class="pay-note">Payment locked in the Arc smart contract · Released only on your approval (or after 48h) · Protected by Influence escrow</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon"></span>
+  <span id="toastMsg"></span>
+</div>
+
+<script src="vendor/ethers.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
