@@ -46,6 +46,22 @@ web/                        Static frontend, no build step
 
 ## Contract design notes
 
+- **`SocialLink.url` stores a real, full `https://` URL per platform**, not a bare
+  handle or follower-count-only entry — `struct SocialLink { string platform;
+  string url; uint256 followers; }`. Only platforms the creator actually filled
+  in get an entry (empty ones are filtered out before the transaction, both
+  client-side and by the contract, which never stores anything with an empty
+  name/rate to begin with). Normalization (turning `@handle` or
+  `instagram.com/handle` into `https://instagram.com/handle`) happens in
+  `app.js`'s `normalizeSocialUrl()` before submission, not in Solidity — string
+  manipulation on-chain (prefix checks, concatenation) costs meaningfully more
+  gas than doing it in JS first, and there's no security reason to enforce it
+  on-chain the way review authenticity needed to be: a malformed link only
+  breaks that one creator's own badge, it can't defraud anyone else. The
+  frontend still only ever renders a stored value as a clickable `<a>` if it
+  passes an `^https?://` check first, so even a value written by a direct
+  contract call that skipped normalization can't become a `javascript:`-scheme
+  or otherwise unsafe link — it just falls back to plain, non-clickable text.
 - **Three separate contracts, not two.** `CreatorRegistry` is a pure profile
   directory now — it used to also cache `ratingSum`/`ratingCount`/`dealsCompleted`
   and had owner-only `seedStats`/`seedReview` functions that existed solely to

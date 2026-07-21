@@ -951,7 +951,7 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
         </select>
 
         <label class="form-label">Social media accounts</label>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Paste your profile links — brands can click to verify your following</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Paste your profile link, or just your handle (e.g. @yourhandle) — we'll build the full link for you. Brands can click through to verify your following.</div>
 
         <div class="social-link-row">
           <div class="social-icon" style="background:#E91E8C20;">📸</div>
@@ -1032,6 +1032,8 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
       <button class="close-btn" onclick="closeModal()">×</button>
     </div>
     <div class="modal-body">
+
+      <div class="platform-row" id="modalSocials" style="margin-bottom:14px;"></div>
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--navy2);border:1px solid var(--border);border-radius:10px;">
         <div class="stars" id="modalStars" style="font-size:14px;"></div>

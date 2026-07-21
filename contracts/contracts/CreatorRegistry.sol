@@ -9,7 +9,7 @@ pragma solidity ^0.8.24;
 contract CreatorRegistry {
     struct SocialLink {
         string platform; // e.g. "Instagram", "TikTok", "YouTube", "Twitter"
-        string handle;
+        string url;       // full https:// profile URL, normalized client-side before submission
         uint256 followers;
     }
 

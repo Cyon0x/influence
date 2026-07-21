@@ -18,6 +18,45 @@ const PLATFORM_ICON = {
   Facebook: 'f', LinkedIn: 'in',
 };
 
+// Base domain + path prefix used to build a full URL from a bare handle,
+// e.g. TikTok handles are conventionally linked as tiktok.com/@handle.
+const PLATFORM_BASE = {
+  Instagram: { domain: 'instagram.com', handlePrefix: '' },
+  TikTok: { domain: 'tiktok.com', handlePrefix: '@' },
+  YouTube: { domain: 'youtube.com', handlePrefix: '@' },
+  Twitter: { domain: 'x.com', handlePrefix: '' },
+};
+
+/* Turns whatever a creator typed into the social-link field — a bare handle
+   ("adaeze_fashion"), an @handle ("@adaeze_fashion"), a protocol-less URL
+   ("instagram.com/adaeze_fashion"), or a full URL — into one consistent,
+   real https:// URL before it's ever sent to the contract. Returns '' if
+   the input is empty or normalization can't produce something link-shaped,
+   so callers can skip storing/rendering a bad entry instead of saving junk. */
+function normalizeSocialUrl(platform, raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+
+  if (/^https?:\/\//i.test(s)) {
+    return /^https?:\/\/.+\..+/i.test(s) ? s : '';
+  }
+
+  const bare = s.replace(/^@/, '').trim();
+  if (!bare) return '';
+
+  // Already looks like "domain.tld/..." without a protocol.
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(bare)) {
+    return 'https://' + bare;
+  }
+
+  // Otherwise treat it as a bare handle for this platform.
+  const base = PLATFORM_BASE[platform];
+  if (!base) return '';
+  const handle = bare.replace(/^@/, '');
+  if (!handle) return '';
+  return `https://${base.domain}/${base.handlePrefix}${handle}`;
+}
+
 const DEAL_STATUS = ['Active', 'ProofSubmitted', 'Completed', 'Cancelled'];
 const AUTO_RELEASE_SECONDS = 48 * 3600;
 
@@ -80,6 +119,20 @@ function safeLinkOrText(url) {
   }
   return escapeHtml(u);
 }
+/* Real, clickable social badge — an <a> only when the stored url actually
+   looks like an http(s) link (it always will for anything saved through
+   normalizeSocialUrl, but this stays defensive against any future direct
+   contract call that bypasses the frontend). stopPropagation keeps a click
+   on the badge from also triggering the card's "open hire modal" handler. */
+function socialBadgeHtml(s) {
+  const icon = PLATFORM_ICON[s.platform] || '🔗';
+  const label = `${icon} ${escapeHtml(s.platform)} <span class="count">${formatFollowers(s.followers)}</span>`;
+  if (/^https?:\/\//i.test(s.url || '')) {
+    return `<a class="platform-badge" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${label}</a>`;
+  }
+  return `<span class="platform-badge">${label}</span>`;
+}
+
 function starsHtml(rating) {
   const rounded = Math.round(rating);
   return '★★★★★'.slice(0, rounded) + '☆☆☆☆☆'.slice(0, 5 - rounded);
@@ -323,7 +376,7 @@ function buildTicker() {
   if (!creatorsList.length) return;
   const items = creatorsList.map((c) => {
     const top = [...c.socials].sort((a, b) => Number(b.followers) - Number(a.followers))[0];
-    const handle = top ? '@' + top.handle.replace(/^.*\//, '').replace(/^@/, '') : c.name;
+    const handle = top ? '@' + top.url.replace(/\/$/, '').replace(/^.*\//, '').replace(/^@/, '') : c.name;
     const count = top ? formatFollowers(top.followers) : '';
     return { handle, count, niche: c.niche };
   });
@@ -357,7 +410,7 @@ async function loadCreators() {
         colorB: p.colorB,
         ratePerPost: p.ratePerPost,
         verified: p.verified,
-        socials: socials.map((s) => ({ platform: s.platform, handle: s.handle, followers: Number(s.followers) })),
+        socials: socials.map((s) => ({ platform: s.platform, url: s.url, followers: Number(s.followers) })),
       };
     });
     creatorsMap = new Map(creatorsList.map((c) => [c.address.toLowerCase(), c]));
@@ -431,7 +484,7 @@ function renderMarketplace() {
 
   let list = creatorsList.filter((c) => {
     if (search) {
-      const hay = [c.name, c.niche, c.location, ...c.socials.map((s) => s.handle)].join(' ').toLowerCase();
+      const hay = [c.name, c.niche, c.location, ...c.socials.map((s) => s.url)].join(' ').toLowerCase();
       if (!hay.includes(search)) return false;
     }
     if (platform && !c.socials.some((s) => s.platform === platform)) return false;
@@ -463,10 +516,7 @@ function renderMarketplace() {
 
 function buildCreatorCardHtml(c) {
   const gradient = `linear-gradient(135deg,${c.colorA},${c.colorB})`;
-  const socialsHtml = c.socials
-    .slice(0, 3)
-    .map((s) => `<span class="platform-badge">${PLATFORM_ICON[s.platform] || '🔗'} ${escapeHtml(s.platform)} <span class="count">${formatFollowers(s.followers)}</span></span>`)
-    .join('');
+  const socialsHtml = c.socials.slice(0, 3).map(socialBadgeHtml).join('');
 
   return `
   <div class="inf-card" onclick="openModalForAddress('${c.address}')">
@@ -500,8 +550,13 @@ function openModalForAddress(addr) {
   document.getElementById('modalAvatar').textContent = initialsFor(c.name);
   document.getElementById('modalName').textContent = c.name;
   document.getElementById('modalVerifiedBadge').style.display = c.verified ? 'inline-flex' : 'none';
-  document.getElementById('modalSub').textContent = `${c.niche} · ${c.location} · ${c.socials.map((s) => formatFollowers(s.followers) + ' ' + s.platform).join(' · ')}`;
+  document.getElementById('modalSub').textContent = `${c.niche} · ${c.location}`;
   document.getElementById('modalAddr').textContent = shortAddr(c.address);
+
+  const modalSocials = document.getElementById('modalSocials');
+  modalSocials.innerHTML = c.socials.length
+    ? c.socials.map(socialBadgeHtml).join('')
+    : '<span style="font-size:12px;color:var(--muted);">No social links provided.</span>';
 
   document.getElementById('modalStars').textContent = '';
   document.getElementById('modalRating').textContent = '…';
@@ -627,10 +682,10 @@ async function submitRegisterProfile() {
   const socials = socialRows
     .map(([platform, handleId, countId]) => ({
       platform,
-      handle: document.getElementById(handleId).value.trim(),
+      url: normalizeSocialUrl(platform, document.getElementById(handleId).value),
       followers: parseInt(document.getElementById(countId).value, 10) || 0,
     }))
-    .filter((s) => s.handle.length > 0);
+    .filter((s) => s.url.length > 0);
 
   const [colorA, colorB] = colorsFromAddress(userAddress);
 
