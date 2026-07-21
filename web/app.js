@@ -31,13 +31,15 @@ let creatorsMap = new Map();
 let selectedHireAddress = null;
 let currentDealFilter = 'all';
 let dealsCache = [];
-let approveRatingState = {}; // dealId -> selected stars (default 5)
+let reviewRatingState = {}; // dealId -> selected stars for the "leave a review" form (default 5)
 
 /* ── Contracts ── */
 function registryRead() { return new ethers.Contract(CFG.registryAddress, CFG.registryAbi, readProvider); }
 function escrowReadC() { return new ethers.Contract(CFG.escrowAddress, CFG.escrowAbi, readProvider); }
+function reviewsReadC() { return new ethers.Contract(CFG.reviewsAddress, CFG.reviewsAbi, readProvider); }
 function registryWrite() { return new ethers.Contract(CFG.registryAddress, CFG.registryAbi, signer); }
 function escrowWrite() { return new ethers.Contract(CFG.escrowAddress, CFG.escrowAbi, signer); }
+function reviewsWrite() { return new ethers.Contract(CFG.reviewsAddress, CFG.reviewsAbi, signer); }
 
 /* ── Small helpers ── */
 function escapeHtml(str) {
@@ -355,9 +357,6 @@ async function loadCreators() {
         colorB: p.colorB,
         ratePerPost: p.ratePerPost,
         verified: p.verified,
-        dealsCompleted: Number(p.dealsCompleted),
-        ratingSum: Number(p.ratingSum),
-        ratingCount: Number(p.ratingCount),
         socials: socials.map((s) => ({ platform: s.platform, handle: s.handle, followers: Number(s.followers) })),
       };
     });
@@ -408,8 +407,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function maxFollowers(c) {
   return c.socials.reduce((m, s) => Math.max(m, Number(s.followers)), 0);
 }
-function avgRating(c) {
-  return c.ratingCount > 0 ? c.ratingSum / c.ratingCount : null;
+/* Ratings live only in the Reviews contract now (no cached aggregate on
+   CreatorRegistry), so there's no cheap way to show a rating on every grid
+   card without fetching each creator's full review list up front — which
+   would multiply RPC calls against an already rate-limited endpoint. Rating
+   is instead fetched live, per creator, only when the hire modal opens. */
+function avgRatingFromReviews(reviews) {
+  if (!reviews.length) return null;
+  return reviews.reduce((sum, r) => sum + Number(r.stars), 0) / reviews.length;
 }
 
 function renderMarketplace() {
@@ -437,12 +442,10 @@ function renderMarketplace() {
       if (rate < min || rate >= max) return false;
     }
     const mf = maxFollowers(c);
-    const rating = avgRating(c);
     if (activePill === '1m' && mf < 1000000) return false;
     if (activePill === '100k-1m' && !(mf >= 100000 && mf < 1000000)) return false;
     if (activePill === '10k-100k' && !(mf >= 10000 && mf < 100000)) return false;
     if (activePill === 'micro' && mf >= 10000) return false;
-    if (activePill === 'top' && !(rating !== null && rating >= 4.5)) return false;
     if (activePill === 'verified' && !c.verified) return false;
     return true;
   });
@@ -459,21 +462,15 @@ function renderMarketplace() {
 }
 
 function buildCreatorCardHtml(c) {
-  const rating = avgRating(c);
-  const featured = rating !== null && rating >= 4.8;
   const gradient = `linear-gradient(135deg,${c.colorA},${c.colorB})`;
   const socialsHtml = c.socials
     .slice(0, 3)
     .map((s) => `<span class="platform-badge">${PLATFORM_ICON[s.platform] || '🔗'} ${escapeHtml(s.platform)} <span class="count">${formatFollowers(s.followers)}</span></span>`)
     .join('');
-  const ratingHtml = rating !== null
-    ? `<div class="stars">${starsHtml(rating)}</div><div class="rating-score">${rating.toFixed(1)}</div><div class="rating-count">· ${c.dealsCompleted} deals</div>`
-    : `<div class="rating-count">New creator · ${c.dealsCompleted} deals</div>`;
 
   return `
-  <div class="inf-card${featured ? ' featured' : ''}" onclick="openModalForAddress('${c.address}')">
-    ${featured ? '<div class="top-tag">🔥 TOP RATED</div>' : ''}
-    <div class="inf-card-top" style="${featured ? 'padding-top:24px' : ''}">
+  <div class="inf-card" onclick="openModalForAddress('${c.address}')">
+    <div class="inf-card-top">
       <div class="inf-profile">
         <div class="inf-avatar" style="background:${gradient};">${escapeHtml(initialsFor(c.name))}</div>
         <div>
@@ -484,7 +481,6 @@ function buildCreatorCardHtml(c) {
       <div class="niche-tag">${escapeHtml(c.niche)}</div>
       <div class="inf-bio">${escapeHtml(c.bio)}</div>
       <div class="platform-row">${socialsHtml}</div>
-      <div class="rating-row">${ratingHtml}</div>
     </div>
     <div class="inf-card-bottom">
       <div><div class="inf-rate">${fmtUSDC(c.ratePerPost, 0)} USDC</div><div class="inf-rate-label">per post · 1% platform fee</div></div>
@@ -507,10 +503,9 @@ function openModalForAddress(addr) {
   document.getElementById('modalSub').textContent = `${c.niche} · ${c.location} · ${c.socials.map((s) => formatFollowers(s.followers) + ' ' + s.platform).join(' · ')}`;
   document.getElementById('modalAddr').textContent = shortAddr(c.address);
 
-  const rating = avgRating(c);
-  document.getElementById('modalStars').textContent = rating !== null ? starsHtml(rating) : '';
-  document.getElementById('modalRating').textContent = rating !== null ? rating.toFixed(1) : 'New';
-  document.getElementById('modalDeals').textContent = `· ${c.dealsCompleted} completed deals`;
+  document.getElementById('modalStars').textContent = '';
+  document.getElementById('modalRating').textContent = '…';
+  document.getElementById('modalDeals').textContent = '';
 
   const rate = c.ratePerPost;
   const feeWei = (rate * 100n) / 10000n;
@@ -524,22 +519,27 @@ function openModalForAddress(addr) {
   document.getElementById('modalBrief').value = '';
 
   document.getElementById('modalReviews').innerHTML = '<div style="font-size:12px;color:var(--muted);">Loading reviews…</div>';
-  withRetry(() => registryRead().getReviews(c.address)).then((reviews) => {
+  withRetry(() => reviewsReadC().getReviews(c.address)).then((reviews) => {
+    const rating = avgRatingFromReviews(reviews);
+    document.getElementById('modalStars').textContent = rating !== null ? starsHtml(rating) : '';
+    document.getElementById('modalRating').textContent = rating !== null ? rating.toFixed(1) : 'New';
+    document.getElementById('modalDeals').textContent = reviews.length ? `· ${reviews.length} review${reviews.length === 1 ? '' : 's'}` : '';
+
     if (!reviews.length) {
-      document.getElementById('modalReviews').innerHTML = '<div style="font-size:12px;color:var(--muted);">No reviews yet.</div>';
+      document.getElementById('modalReviews').innerHTML = '<div style="font-size:12px;color:var(--muted);">No reviews yet — reviews appear here once a brand completes a paid deal with this creator and reviews it.</div>';
       return;
     }
     document.getElementById('modalReviews').innerHTML = [...reviews].reverse().map((r) => {
-      const name = r.reviewerName && r.reviewerName.length ? r.reviewerName : shortAddr(r.brand);
       const date = new Date(Number(r.timestamp) * 1000);
       return `<div class="review-item">
-        <div class="review-top"><div class="reviewer-name">${escapeHtml(name)}</div><div class="review-stars">${starsHtml(Number(r.stars))}</div></div>
-        <div class="review-text">${escapeHtml(r.text)}</div>
-        <div class="review-date">${relativeTime(date)}</div>
+        <div class="review-top"><div class="reviewer-name">${escapeHtml(shortAddr(r.brand))}</div><div class="review-stars">${starsHtml(Number(r.stars))}</div></div>
+        <div class="review-text">${r.text ? escapeHtml(r.text) : '<span style=\'opacity:0.6\'>No written comment.</span>'}</div>
+        <div class="review-date">${relativeTime(date)} · deal #${Number(r.dealId)}</div>
       </div>`;
     }).join('');
   }).catch(() => {
     document.getElementById('modalReviews').innerHTML = '<div style="font-size:12px;color:var(--muted);">Couldn\'t load reviews.</div>';
+    document.getElementById('modalRating').textContent = '';
   });
 
   document.getElementById('hireModal').classList.add('show');
@@ -702,6 +702,7 @@ async function loadMyDeals() {
         proofSubmittedAt: Number(d.proofSubmittedAt),
         completedAt: Number(d.completedAt),
         roles: roleById.get(id),
+        reviewed: null, // filled in below for completed deals the viewer brand-owns
       };
     }).sort((a, b) => b.createdAt - a.createdAt);
 
@@ -710,6 +711,17 @@ async function loadMyDeals() {
     document.getElementById('dealsNavBadge').textContent = activeCount;
 
     renderDeals();
+
+    // Second pass: only for completed deals where this wallet is the brand,
+    // check whether a review has already been submitted (needed to decide
+    // whether to show the "leave a review" form).
+    const reviewsC = reviewsReadC();
+    const toCheck = dealsCache.filter((d) => d.status === 2 && d.roles.brand);
+    if (toCheck.length) {
+      const reviewed = await mapSerial(toCheck, (d) => reviewsC.hasReviewed(d.id));
+      toCheck.forEach((d, i) => { d.reviewed = reviewed[i]; });
+      renderDeals();
+    }
   } catch (err) {
     container.innerHTML = `<div class="deals-empty"><div class="emoji">⚠️</div>Couldn't load deals.<br/><span style="font-size:11px;">${escapeHtml(txErrorMessage(err))}</span></div>`;
   }
@@ -793,20 +805,13 @@ function buildDealCardHtml(d) {
     // Proof submitted: waiting on brand (or auto-release)
     const ar = autoReleaseStatus(d);
     if (isBrand) {
-      const stars = approveRatingState[d.id] || 5;
-      const starButtons = [1, 2, 3, 4, 5].map((n) =>
-        `<button type="button" class="star-btn ${n <= stars ? 'on' : ''}" onclick="setApproveStars(${d.id},${n})">★</button>`
-      ).join('');
       body = `
         <div class="proof-submitted-panel">
           <div class="proof-submitted-title">📋 Proof submitted by ${escapeHtml(name)}</div>
           <div class="proof-submitted-item"><strong>Proof:</strong>&nbsp;${safeLinkOrText(d.proofLink)}</div>
         </div>
-        <label class="form-label">Rate this delivery</label>
-        <div class="rating-input">${starButtons}</div>
-        <input class="proof-upload-input" type="text" id="review-input-${d.id}" placeholder="Optional review comment..." />
         <button class="btn-acknowledge" onclick="approveDeal(${d.id})">✅ Acknowledge &amp; Release Funds</button>
-        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">This releases ${fmtUSDC(d.amount * 99n / 100n)} USDC to ${escapeHtml(name)} and ${fmtUSDC(d.amount - d.amount * 99n / 100n)} USDC to Influence. Irreversible.</div>
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">This releases ${fmtUSDC(d.amount * 99n / 100n)} USDC to ${escapeHtml(name)} and ${fmtUSDC(d.amount - d.amount * 99n / 100n)} USDC to Influence. Irreversible. You can leave a review once funds are released.</div>
         ${ar.eligible ? `<button class="btn-secondary-line auto" onclick="triggerAutoRelease(${d.id})">⏱ ${ar.text} — trigger it</button>` : ''}`;
     } else if (isCreator) {
       body = `
@@ -830,6 +835,26 @@ function buildDealCardHtml(d) {
           <div class="completed-sub">${fmtUSDC(creatorAmt)} USDC → creator · ${fmtUSDC(feeAmt)} USDC → Influence · Total ${fmtUSDC(d.amount)} USDC</div>
         </div>
       </div>`;
+
+    if (isBrand) {
+      if (d.reviewed === null) {
+        body += `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;">Checking review status…</div>`;
+      } else if (d.reviewed) {
+        body += `<div style="font-size:12px;color:var(--mint);text-align:center;margin-top:10px;">✓ You've reviewed this deal.</div>`;
+      } else {
+        const stars = reviewRatingState[d.id] || 5;
+        const starButtons = [1, 2, 3, 4, 5].map((n) =>
+          `<button type="button" class="star-btn ${n <= stars ? 'on' : ''}" onclick="setReviewStars(${d.id},${n})">★</button>`
+        ).join('');
+        body += `
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <label class="form-label">Leave a review for ${escapeHtml(name)}</label>
+            <div class="rating-input">${starButtons}</div>
+            <input class="proof-upload-input" type="text" id="review-text-${d.id}" placeholder="Optional review comment..." />
+            <button class="btn-acknowledge" onclick="submitReviewForDeal(${d.id})">✍️ Submit Review</button>
+          </div>`;
+      }
+    }
   } else {
     body = `
       <div class="completed-panel" style="background:rgba(167,155,176,0.1);border-color:var(--border);">
@@ -867,8 +892,8 @@ function buildDealCardHtml(d) {
   </div>`;
 }
 
-function setApproveStars(dealId, n) {
-  approveRatingState[dealId] = n;
+function setReviewStars(dealId, n) {
+  reviewRatingState[dealId] = n;
   renderDeals();
 }
 
@@ -894,16 +919,28 @@ async function submitProofForDeal(dealId) {
 
 async function approveDeal(dealId) {
   if (!requireReadyToTransact()) return;
-  const stars = approveRatingState[dealId] || 5;
-  const reviewInput = document.getElementById(`review-input-${dealId}`);
-  const review = reviewInput ? reviewInput.value.trim() : '';
   try {
     showToast('⏳', 'Confirm the transaction in your wallet…');
-    const tx = await escrowWrite().approveAndRelease(dealId, stars, review);
+    const tx = await escrowWrite().approveAndRelease(dealId);
     const receipt = await tx.wait();
     showToast('💸', `Funds released on Arc! ${explorerTxLink(receipt.hash)}`);
     loadMyDeals();
-    loadCreators();
+  } catch (err) {
+    showToast('⚠️', txErrorMessage(err), true);
+  }
+}
+
+async function submitReviewForDeal(dealId) {
+  if (!requireReadyToTransact()) return;
+  const stars = reviewRatingState[dealId] || 5;
+  const textInput = document.getElementById(`review-text-${dealId}`);
+  const text = textInput ? textInput.value.trim() : '';
+  try {
+    showToast('⏳', 'Confirm the transaction in your wallet…');
+    const tx = await reviewsWrite().submitReview(dealId, stars, text);
+    const receipt = await tx.wait();
+    showToast('✍️', `Review submitted on-chain. ${explorerTxLink(receipt.hash)}`);
+    loadMyDeals();
   } catch (err) {
     showToast('⚠️', txErrorMessage(err), true);
   }
@@ -917,7 +954,6 @@ async function triggerAutoRelease(dealId) {
     const receipt = await tx.wait();
     showToast('💸', `Auto-release complete. ${explorerTxLink(receipt.hash)}`);
     loadMyDeals();
-    loadCreators();
   } catch (err) {
     showToast('⚠️', txErrorMessage(err), true);
   }

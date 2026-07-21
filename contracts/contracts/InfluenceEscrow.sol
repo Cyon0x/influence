@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface ICreatorRegistry {
-    function recordCompletedDeal(
-        address creator,
-        address brand,
-        uint256 dealId,
-        uint8 stars,
-        string calldata reviewText
-    ) external;
-}
-
 /// @title InfluenceEscrow
 /// @notice Locks native USDC (Arc's gas token) for a brand->creator deal, released either by
-///         brand approval or automatically 48h after proof is submitted.
+///         brand approval or automatically 48h after proof is submitted. Rating/reviews are
+///         handled entirely by the separate Reviews contract, which reads deal outcomes from
+///         this contract's public `deals` getter — this contract has no knowledge of reviews.
 contract InfluenceEscrow {
     enum Status {
         Active,         // funded, waiting on creator
@@ -39,7 +31,6 @@ contract InfluenceEscrow {
 
     address public owner;
     address public feeRecipient;
-    ICreatorRegistry public registry;
 
     Deal[] public deals;
     mapping(address => uint256[]) private brandDeals;
@@ -55,9 +46,8 @@ contract InfluenceEscrow {
         _;
     }
 
-    constructor(address _registry, address _feeRecipient) {
+    constructor(address _feeRecipient) {
         owner = msg.sender;
-        registry = ICreatorRegistry(_registry);
         feeRecipient = _feeRecipient;
     }
 
@@ -117,14 +107,13 @@ contract InfluenceEscrow {
         emit ProofSubmitted(dealId, proofLink);
     }
 
-    /// @notice Brand approves delivered work, releases funds, and leaves a star rating.
-    function approveAndRelease(uint256 dealId, uint8 stars, string calldata reviewText) external {
+    /// @notice Brand approves delivered work and releases funds.
+    function approveAndRelease(uint256 dealId) external {
         Deal storage d = deals[dealId];
         require(msg.sender == d.brand, "not the brand");
         require(d.status == Status.ProofSubmitted, "wrong status");
-        require(stars >= 1 && stars <= 5, "stars 1-5");
 
-        _release(dealId, stars, reviewText, false);
+        _release(dealId, false);
     }
 
     /// @notice Anyone can trigger release once 48h have passed since proof submission.
@@ -133,10 +122,10 @@ contract InfluenceEscrow {
         require(d.status == Status.ProofSubmitted, "wrong status");
         require(block.timestamp >= d.proofSubmittedAt + AUTO_RELEASE_DELAY, "too early");
 
-        _release(dealId, 0, "", true);
+        _release(dealId, true);
     }
 
-    function _release(uint256 dealId, uint8 stars, string memory reviewText, bool autoReleased) internal {
+    function _release(uint256 dealId, bool autoReleased) internal {
         Deal storage d = deals[dealId];
         d.status = Status.Completed;
         d.completedAt = block.timestamp;
@@ -148,8 +137,6 @@ contract InfluenceEscrow {
         require(sentCreator, "creator transfer failed");
         (bool sentFee, ) = payable(feeRecipient).call{value: fee}("");
         require(sentFee, "fee transfer failed");
-
-        registry.recordCompletedDeal(d.creator, d.brand, dealId, stars, reviewText);
 
         emit DealReleased(dealId, creatorAmount, fee, autoReleased);
     }

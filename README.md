@@ -2,8 +2,10 @@
 
 A real, working dApp: brands lock native USDC in an on-chain escrow contract to hire
 creators; funds release when the brand approves (or automatically after 48h). No
-backend, no database — creator profiles, deals, and reviews all live on-chain on
-[Arc Testnet](https://docs.arc.io), Circle's stablecoin-native L1.
+backend, no database, no seeded/demo data of any kind — creator profiles, deals,
+and reviews all live on-chain on [Arc Testnet](https://docs.arc.io), Circle's
+stablecoin-native L1. The marketplace shows only creators who have genuinely
+registered themselves; reviews only exist for deals that were genuinely paid out.
 
 **Live app**: https://influence-orpin.vercel.app — auto-deployed from `main` via the
 `web/` directory (Vercel project root is set to `web`).
@@ -16,8 +18,7 @@ backend, no database — creator profiles, deals, and reviews all live on-chain 
 | RPC | `https://rpc.testnet.arc.network` |
 | Explorer | https://testnet.arcscan.app |
 | Faucet | https://faucet.circle.com (20 USDC / 2h per address) |
-| CreatorRegistry | see `contracts/deployed.json` |
-| InfluenceEscrow | see `contracts/deployed.json` |
+| CreatorRegistry / InfluenceEscrow / Reviews | see `contracts/deployed.json` |
 
 USDC is Arc's **native gas token** (18 decimals) — brands don't `approve()` an
 ERC-20, they just send value with the transaction, same as sending ETH.
@@ -27,14 +28,13 @@ ERC-20, they just send value with the transaction, same as sending ETH.
 ```
 contracts/                 Hardhat project
   contracts/
-    CreatorRegistry.sol     on-chain creator profiles, ratings, reviews
+    CreatorRegistry.sol     pure on-chain profile directory (name/bio/niche/socials/rate)
     InfluenceEscrow.sol     deal lifecycle: create / proof / approve / auto-release / cancel
-  test/                     9 passing unit tests (full lifecycle, access control, timing)
-  scripts/
-    deploy.js                deploys both contracts, links them, seeds 7 demo creators
-    e2e-check.js              live integration test against the deployed testnet contracts
+    Reviews.sol              standalone review ledger, reads deal outcomes from InfluenceEscrow
+  test/                     15 passing unit tests across all three contracts
+  scripts/deploy.js         deploys all three contracts fresh, wires Reviews to Escrow.
+                            Writes NO seed/demo data — registry and escrow start empty.
   deployed.json             addresses + network info (safe to share, no secrets)
-  seed-wallets.json         demo creators' private keys — LOCAL ONLY, gitignored
   .env                      DEPLOYER_PRIVATE_KEY, RPC URL, fee recipient — gitignored
 
 web/                        Static frontend, no build step
@@ -46,20 +46,45 @@ web/                        Static frontend, no build step
 
 ## Contract design notes
 
+- **Three separate contracts, not two.** `CreatorRegistry` is a pure profile
+  directory now — it used to also cache `ratingSum`/`ratingCount`/`dealsCompleted`
+  and had owner-only `seedStats`/`seedReview` functions that existed solely to
+  inject demo data. Those were removed entirely (not just left unused) once
+  reviews moved to their own contract.
+- **`Reviews.sol` is standalone by design**, not bolted onto `CreatorRegistry` or
+  `InfluenceEscrow`. It takes `InfluenceEscrow`'s address in its constructor and
+  reads deal outcomes directly from Escrow's public `deals(dealId)` getter — it
+  doesn't touch `CreatorRegistry` at all (a review is valid regardless of whether
+  the creator ever registered a profile). This means neither `CreatorRegistry`
+  nor `InfluenceEscrow` needs to be redeployed if the review system changes again.
+- **On-chain enforcement, not frontend trust**: `Reviews.submitReview(dealId, stars,
+  text)` reverts unless (a) the referenced deal's status is genuinely `Completed`
+  and (b) `msg.sender` is exactly that deal's `brand` address. One review per
+  `dealId` (`dealReviewed[dealId]`), not per brand-creator pair, so the same brand
+  can review multiple separate deals with the same creator. None of this can be
+  bypassed by calling the contract directly — there's no separate/softer check in
+  the frontend.
+- **`InfluenceEscrow.approveAndRelease(dealId)` takes no rating params anymore.**
+  It used to accept `(dealId, stars, reviewText)` and write straight into
+  `CreatorRegistry`, coupling fund release to review submission. That's gone —
+  approving a deal only releases funds; leaving a review is a separate, optional
+  transaction against `Reviews.sol` afterward.
 - **Escrow math**: brand locks exactly the creator's listed rate. On release, the
   creator receives 99% and the platform (`feeRecipient`) receives 1%
-  (`FEE_BPS = 100`). This is deliberately different from the original prototype,
-  which used two conflicting fee formulas in different screens — this version
-  picks one and is consistent everywhere.
+  (`FEE_BPS = 100`).
 - **Auto-release**: 48h after `submitProof`, *anyone* can call `autoRelease` to pay
-  the creator if the brand never responds — this protects creators from brands
-  who ghost.
+  the creator if the brand never responds.
 - **Cancel**: a brand can reclaim funds via `cancelDeal` any time before the
-  creator submits proof — without this, a creator who never delivers and never
-  submits proof would lock the brand's funds forever with no exit.
-- **No backend**: `CreatorRegistry` holds name/bio/niche/socials/rate/reviews.
-  Avatars are algorithmically colored circles (2-color gradient derived from the
-  wallet address) with initials — there's no image upload/storage.
+  creator submits proof.
+- **No backend**: Avatars are algorithmically colored circles (2-color gradient
+  derived from the wallet address) with initials — there's no image upload/storage.
+- **No aggregate rating cached anywhere on-chain.** Since ratings live only in
+  `Reviews.sol` and there's no cheap way to read "this creator's average rating"
+  without fetching their full review list, the frontend only fetches reviews (and
+  computes an average client-side) when you open a specific creator's hire modal —
+  not for every card in the marketplace grid. That's a deliberate tradeoff against
+  Arc testnet's rate-limited public RPC (see below): a "★ rating" badge on every
+  grid card would mean fetching every creator's reviews just to render the list.
 
 ## Running locally
 
@@ -73,26 +98,32 @@ That's it — it's a static site. Connect a MetaMask (or any EIP-1193 wallet)
 funded with testnet USDC from the faucet; the app will prompt you to add/switch
 to Arc Testnet if needed.
 
-## Testing both sides of a deal
+## Testing the full loop (including a real review)
 
-To see the full brand ↔ creator loop, you need two wallets:
+The registry starts genuinely empty — there is no seed data to hire against. To
+exercise the whole flow you need two wallets:
 
-1. Your own wallet acts as the **brand** — hire any of the 7 seeded demo creators
-   from the marketplace.
-2. To act as that creator (submit proof, get paid), import their private key from
-   `contracts/seed-wallets.json` into a second MetaMask account. Each demo wallet
-   was funded with 1 USDC for gas.
-3. Or register your own creator profile from a second wallet via "Join as
-   Creator", and hire *that* profile from your main wallet.
+1. Register a creator profile from **wallet B** via "Join as Creator".
+2. From **wallet A**, hire that profile from the marketplace — this locks USDC in
+   `InfluenceEscrow`.
+3. Switch to **wallet B**, go to My Deals, submit proof for that deal.
+4. Switch back to **wallet A**, go to My Deals, click "Acknowledge & Release
+   Funds" — this pays wallet B (99%) and the platform fee recipient (1%).
+5. Still as **wallet A**, on that same now-completed deal, use the "Leave a
+   review" form that appears — this calls `Reviews.submitReview`. Confirm it shows
+   up on wallet B's profile in the marketplace (open their hire modal).
+6. Try reviewing the same deal again, or reviewing as wallet B, or reviewing
+   before step 4 — all three should be rejected by the contract (not just the UI).
 
 ## Redeploying
 
 ```bash
 cd contracts
 npx hardhat compile
-npx hardhat test                              # 9 tests, no network needed
+npx hardhat test                              # 15 tests, no network needed
 npx hardhat run scripts/deploy.js --network arcTestnet
-node -e "... regenerate web/config.js ..."    # see git history / ask your assistant
+# then regenerate web/config.js from contracts/deployed.json + the 3 ABIs
+# (ask your assistant, or see git history for the exact node -e snippet)
 ```
 
 `.env` needs:
@@ -101,6 +132,12 @@ DEPLOYER_PRIVATE_KEY=0x...   # testnet-only burner, becomes owner + feeRecipient
 ARC_TESTNET_RPC_URL=https://rpc.testnet.arc.network
 FEE_RECIPIENT=0x...          # defaults to the deployer address
 ```
+
+Redeploying `CreatorRegistry` or `InfluenceEscrow` abandons whatever was
+registered/in-flight on the old addresses (blockchains don't support deleting a
+contract's data — the old contract just sits there, unused, forever). `Reviews.sol`
+is pinned to one `InfluenceEscrow` address at construction time, so redeploying
+Escrow means redeploying Reviews too.
 
 ## Known limitation: public RPC rate limits
 
