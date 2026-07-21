@@ -5,6 +5,9 @@ creators; funds release when the brand approves (or automatically after 48h). No
 backend, no database — creator profiles, deals, and reviews all live on-chain on
 [Arc Testnet](https://docs.arc.io), Circle's stablecoin-native L1.
 
+**Live app**: https://influence-orpin.vercel.app — auto-deployed from `main` via the
+`web/` directory (Vercel project root is set to `web`).
+
 ## Live deployment
 
 | | |
