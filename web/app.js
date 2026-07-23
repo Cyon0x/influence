@@ -301,6 +301,31 @@ function openExplorerForAddress() {
   if (userAddress) window.open(`${CFG.explorer}/address/${userAddress}`, '_blank', 'noopener');
 }
 
+async function disconnectWallet() {
+  // There's no universal EIP-1193 "disconnect" — MetaMask and a few others
+  // support revoking the eth_accounts permission programmatically, so this
+  // asks for that where possible, but it's a best-effort bonus, not required:
+  // clearing local state below is what actually makes the app forget the
+  // connection and stop auto-reconnecting on the next visit either way.
+  try {
+    await window.ethereum?.request({
+      method: 'wallet_revokePermissions',
+      params: [{ eth_accounts: {} }],
+    });
+  } catch (err) {
+    // Wallet doesn't support programmatic revocation — fine, continue below.
+  }
+
+  userAddress = null;
+  signer = null;
+  browserProvider = null;
+  localStorage.removeItem('influence_connected');
+  document.getElementById('networkBanner').classList.remove('show');
+  updateWalletUI();
+  if (document.getElementById('view-deals').style.display !== 'none') loadMyDeals();
+  showToast('👋', 'Wallet disconnected.');
+}
+
 function updateNetworkBanner(chainId) {
   const banner = document.getElementById('networkBanner');
   if (chainId !== CFG.chainId) banner.classList.add('show');

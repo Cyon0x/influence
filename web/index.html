@@ -242,10 +242,19 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
 .wallet-chip {
   display: flex; align-items: center; gap: 7px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; padding: 6px 12px;
+  border-radius: 20px; padding: 6px 10px 6px 12px;
   font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted);
-  cursor: pointer;
 }
+.wallet-chip .wallet-addr { cursor: pointer; }
+.wallet-chip .wallet-addr:hover { color: var(--text); }
+.wallet-disconnect-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: none; border: none; color: var(--muted);
+  font-size: 10px; cursor: pointer; padding: 0; line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+.wallet-disconnect-btn:hover { background: rgba(255,92,92,0.15); color: var(--red); }
 .connect-btn {
   background: var(--violet); border: none; color: #fff;
   padding: 7px 16px; border-radius: 8px;
@@ -791,7 +800,11 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode">
         <span class="theme-icon">🌙</span>
       </button>
-      <div class="wallet-chip" id="walletChip" style="display:none;" onclick="openExplorerForAddress()"><div class="live-dot"></div><span class="wallet-addr" id="walletAddr"></span></div>
+      <div class="wallet-chip" id="walletChip" style="display:none;">
+        <div class="live-dot"></div>
+        <span class="wallet-addr" id="walletAddr" onclick="openExplorerForAddress()" title="View on explorer"></span>
+        <button class="wallet-disconnect-btn" onclick="disconnectWallet()" title="Disconnect wallet" aria-label="Disconnect wallet">✕</button>
+      </div>
       <button class="connect-btn" id="connectBtn" onclick="onConnectClick()">Connect Wallet</button>
     </div>
   </div>
