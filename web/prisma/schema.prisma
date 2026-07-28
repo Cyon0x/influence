@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Off-chain only, by design: wallet -> notification email. Never written
+// to CreatorRegistry — anything on a public chain is permanently public,
+// and an email address doesn't need to be.
+model CreatorContact {
+  address    String   @id // lowercase 0x... wallet address
+  email      String
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+// Dedupe guarantee for notification emails. Both the instant client-triggered
+// path and the cron backstop go through the same tryNotify() call, which
+// relies on the unique constraint below to make "already sent" atomic and
+// race-safe — whichever path gets there first wins, the other is a no-op.
+model NotificationLog {
+  id       String   @id @default(cuid())
+  dealId   Int
+  kind     String // "HIRED" | "RELEASED"
+  sentAt   DateTime @default(now())
+
+  @@unique([dealId, kind])
+}
+
+// Singleton row tracking how far the cron backstop has scanned InfluenceEscrow
+// event logs, so it only re-scans new blocks each run.
+model SyncCursor {
+  id         String   @id @default("escrow")
+  lastBlock  Int
+  updatedAt  DateTime @updatedAt
+}

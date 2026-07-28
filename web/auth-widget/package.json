@@ -1,0 +1,20 @@
+{
+  "name": "influence-auth-widget",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Small isolated React build exposing Privy (Twitter/email embedded-wallet login) as a plain window.InfluenceAuth API for the vanilla-JS site to call. Not part of the main app's runtime code path — only this directory needs React/Vite.",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "^2.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.5",
+    "vite-plugin-node-polyfills": "^0.28.0"
+  }
+}

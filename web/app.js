@@ -184,6 +184,36 @@ function explorerTxLink(hash) {
   return `<a href="${CFG.explorer}/tx/${hash}" target="_blank" rel="noopener noreferrer">view tx ↗</a>`;
 }
 
+/* Pulls dealId out of a DealCreated receipt — createDeal()'s return value
+   isn't directly readable from a mined tx, so it's decoded from the emitted
+   event log instead. */
+function findEventArgs(receipt, contract, eventName) {
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log);
+      if (parsed && parsed.name === eventName) return parsed.args;
+    } catch (err) {
+      // Not this contract's log (or not decodable) — expected for most logs, skip.
+    }
+  }
+  return null;
+}
+
+/* Best-effort trigger for the near-instant notification email — fire and
+   forget. If this fails silently (network blip, function cold-start error,
+   whatever), the daily cron backstop in api/cron/notify-backstop.js will
+   still catch it from the real on-chain event, so a failure here is never
+   the difference between "notified" and "never notified," only "instant"
+   vs "up to a day later." Never surfaced to the user — an email side effect
+   isn't worth interrupting a successful on-chain transaction over. */
+function triggerNotify(kind, dealId, txHash, extra = {}) {
+  fetch(`/api/notify/${kind}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dealId, txHash, ...extra }),
+  }).catch(() => {});
+}
+
 /* ── Theme ── */
 function toggleTheme() {
   const html = document.documentElement;
@@ -232,16 +262,57 @@ function activateView(viewId) {
   if (viewId === 'deals') loadMyDeals();
 }
 
-/* ── Wallet connection ── */
-async function onConnectClick() {
-  if (!window.ethereum) {
-    showToast('⚠️', 'No wallet extension found. Install MetaMask (or another EVM wallet) to continue.', true);
-    return;
-  }
-  await connectWallet(true);
+/* ── Wallet connection ──────────────────────────────────────────
+   Two independent auth paths that converge on the same downstream state
+   (userAddress / signer / browserProvider): MetaMask (or any injected
+   window.ethereum) and Privy (Twitter/email -> embedded wallet, via the
+   auth-widget.js bridge script — see auth-widget/src/main.jsx). Once
+   connected via either path, every contract call elsewhere in this file is
+   identical — they only ever touch `signer`, never care where it came from.
+   activeAuthMethod tracks which one is live, so disconnect and the
+   MetaMask-only account/chain-change listeners know whether to act. */
+let activeAuthMethod = null; // null | 'metamask' | 'privy'
+
+function privyAvailable() {
+  return typeof window.InfluenceAuth !== 'undefined' && !window.InfluenceAuth.failed;
 }
 
-async function connectWallet(interactive) {
+async function onConnectClick() {
+  const hasMetaMask = Boolean(window.ethereum);
+  const hasPrivy = privyAvailable();
+
+  if (hasMetaMask && hasPrivy) {
+    document.getElementById('authChooserModal').classList.add('show');
+    return;
+  }
+  if (hasPrivy) {
+    closeAuthChooser();
+    await connectViaPrivy();
+    return;
+  }
+  if (hasMetaMask) {
+    closeAuthChooser();
+    await connectViaMetaMask(true);
+    return;
+  }
+  showToast('⚠️', 'No wallet extension found, and social login is unavailable right now. Install MetaMask to continue.', true);
+}
+
+function closeAuthChooser() {
+  document.getElementById('authChooserModal').classList.remove('show');
+}
+
+async function chooseMetaMask() {
+  closeAuthChooser();
+  await connectViaMetaMask(true);
+}
+
+async function choosePrivy() {
+  closeAuthChooser();
+  await connectViaPrivy();
+}
+
+async function connectViaMetaMask(interactive) {
   const btn = document.getElementById('connectBtn');
   try {
     btn.disabled = true;
@@ -259,7 +330,8 @@ async function connectWallet(interactive) {
     browserProvider = new ethers.BrowserProvider(window.ethereum);
     signer = await browserProvider.getSigner();
     userAddress = accounts[0];
-    localStorage.setItem('influence_connected', '1');
+    activeAuthMethod = 'metamask';
+    localStorage.setItem('influence_connected', 'metamask');
 
     const network = await browserProvider.getNetwork();
     updateNetworkBanner(Number(network.chainId));
@@ -271,6 +343,47 @@ async function connectWallet(interactive) {
   } finally {
     btn.disabled = false;
     if (!userAddress) btn.textContent = 'Connect Wallet';
+  }
+}
+
+async function connectViaPrivy() {
+  if (!privyAvailable()) {
+    showToast('⚠️', 'Social login is unavailable right now.', true);
+    return;
+  }
+  await window.InfluenceAuth.ready;
+  window.InfluenceAuth.login();
+  // Completion (success or cancel) arrives asynchronously via the onChange
+  // listener registered in init() — Privy's own modal handles the
+  // Twitter-vs-email choice, there's nothing to await synchronously here.
+}
+
+// Fired whenever Privy's auth state changes — a fresh login, a session
+// Privy restored automatically on page load, or a logout.
+async function onPrivyAuthChange({ authenticated, address }) {
+  if (authenticated && address) {
+    try {
+      const provider = await window.InfluenceAuth.getProvider();
+      browserProvider = new ethers.BrowserProvider(provider);
+      signer = await browserProvider.getSigner();
+      userAddress = address;
+      activeAuthMethod = 'privy';
+      localStorage.setItem('influence_connected', 'privy');
+
+      const network = await browserProvider.getNetwork();
+      updateNetworkBanner(Number(network.chainId));
+      updateWalletUI();
+      if (document.getElementById('view-deals').style.display !== 'none') loadMyDeals();
+    } catch (err) {
+      showToast('⚠️', txErrorMessage(err), true);
+    }
+  } else if (activeAuthMethod === 'privy') {
+    userAddress = null;
+    signer = null;
+    browserProvider = null;
+    activeAuthMethod = null;
+    localStorage.removeItem('influence_connected');
+    updateWalletUI();
   }
 }
 
@@ -302,23 +415,32 @@ function openExplorerForAddress() {
 }
 
 async function disconnectWallet() {
-  // There's no universal EIP-1193 "disconnect" — MetaMask and a few others
-  // support revoking the eth_accounts permission programmatically, so this
-  // asks for that where possible, but it's a best-effort bonus, not required:
-  // clearing local state below is what actually makes the app forget the
-  // connection and stop auto-reconnecting on the next visit either way.
-  try {
-    await window.ethereum?.request({
-      method: 'wallet_revokePermissions',
-      params: [{ eth_accounts: {} }],
-    });
-  } catch (err) {
-    // Wallet doesn't support programmatic revocation — fine, continue below.
+  if (activeAuthMethod === 'privy' && privyAvailable()) {
+    try {
+      window.InfluenceAuth.logout();
+    } catch (err) {
+      // Continue regardless — local state below is what actually matters.
+    }
+  } else {
+    // There's no universal EIP-1193 "disconnect" — MetaMask and a few others
+    // support revoking the eth_accounts permission programmatically, so this
+    // asks for that where possible, but it's a best-effort bonus, not
+    // required: clearing local state below is what actually makes the app
+    // forget the connection and stop auto-reconnecting on the next visit.
+    try {
+      await window.ethereum?.request({
+        method: 'wallet_revokePermissions',
+        params: [{ eth_accounts: {} }],
+      });
+    } catch (err) {
+      // Wallet doesn't support programmatic revocation — fine, continue below.
+    }
   }
 
   userAddress = null;
   signer = null;
   browserProvider = null;
+  activeAuthMethod = null;
   localStorage.removeItem('influence_connected');
   document.getElementById('networkBanner').classList.remove('show');
   updateWalletUI();
@@ -663,6 +785,8 @@ async function hireSelectedCreator() {
     btn.textContent = '⏳ Locking funds on Arc…';
     const receipt = await tx.wait();
     showToast('🔒', `${fmtUSDC(c.ratePerPost)} USDC locked in escrow for ${escapeHtml(c.name)}. ${explorerTxLink(receipt.hash)}`);
+    const created = findEventArgs(receipt, escrowWrite(), 'DealCreated');
+    if (created) triggerNotify('hired', Number(created.dealId), receipt.hash);
     closeModal();
     switchNavById('deals');
   } catch (err) {
@@ -680,10 +804,7 @@ function updateRatePreview(val) {
 }
 
 async function submitRegisterProfile() {
-  if (!requireReadyToTransact()) {
-    await connectWallet(true);
-    if (!signer) return;
-  }
+  if (!requireReadyToTransact()) return;
 
   const name = document.getElementById('regName').value.trim();
   const location = document.getElementById('regLocation').value.trim();
@@ -732,6 +853,50 @@ async function submitRegisterProfile() {
     showToast('✦', `Profile live on Arc testnet! ${explorerTxLink(receipt.hash)}`);
     await loadCreators();
     switchNavById('marketplace');
+  } catch (err) {
+    showToast('⚠️', txErrorMessage(err), true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// Must byte-for-byte match contactMessage() in web/api/contact.js — this is
+// the exact string the wallet signs, and the server recovers the signer
+// from it. No shared module between browser and serverless function here,
+// so keep both in sync by hand.
+function buildContactMessage(email, timestamp) {
+  return `Set my Influence notification email to: ${email}\n\nTimestamp: ${timestamp}`;
+}
+
+async function saveNotificationEmail() {
+  if (!requireReadyToTransact()) return;
+
+  const email = document.getElementById('regEmail').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('⚠️', 'Please enter a valid email address.', true);
+    return;
+  }
+
+  const btn = document.getElementById('regEmailSaveBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  try {
+    btn.textContent = '⏳ Confirm signature in wallet…';
+    const timestamp = Date.now();
+    const signature = await signer.signMessage(buildContactMessage(email, timestamp));
+
+    btn.textContent = '⏳ Saving…';
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: userAddress, email, signature, timestamp }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `request failed (${res.status})`);
+    }
+    showToast('✉️', "Saved — we'll email you when you're hired and when funds are released.");
   } catch (err) {
     showToast('⚠️', txErrorMessage(err), true);
   } finally {
@@ -1004,6 +1169,7 @@ async function approveDeal(dealId) {
     const tx = await escrowWrite().approveAndRelease(dealId);
     const receipt = await tx.wait();
     showToast('💸', `Funds released on Arc! ${explorerTxLink(receipt.hash)}`);
+    triggerNotify('released', dealId, receipt.hash, { auto: false });
     loadMyDeals();
   } catch (err) {
     showToast('⚠️', txErrorMessage(err), true);
@@ -1033,6 +1199,7 @@ async function triggerAutoRelease(dealId) {
     const tx = await escrowWrite().autoRelease(dealId);
     const receipt = await tx.wait();
     showToast('💸', `Auto-release complete. ${explorerTxLink(receipt.hash)}`);
+    triggerNotify('released', dealId, receipt.hash, { auto: true });
     loadMyDeals();
   } catch (err) {
     showToast('⚠️', txErrorMessage(err), true);
@@ -1056,17 +1223,21 @@ async function cancelDealAction(dealId) {
 /* ── Wallet event listeners ── */
 if (window.ethereum) {
   window.ethereum.on('accountsChanged', (accounts) => {
+    if (activeAuthMethod !== 'metamask' && activeAuthMethod !== null) return; // a Privy session owns the current state, ignore stray MetaMask events
     if (!accounts.length) {
       userAddress = null;
       signer = null;
+      activeAuthMethod = null;
       localStorage.removeItem('influence_connected');
       updateWalletUI();
       if (document.getElementById('view-deals').style.display !== 'none') loadMyDeals();
     } else {
-      connectWallet(false);
+      connectViaMetaMask(false);
     }
   });
-  window.ethereum.on('chainChanged', () => window.location.reload());
+  window.ethereum.on('chainChanged', () => {
+    if (activeAuthMethod === 'metamask') window.location.reload();
+  });
 }
 
 /* ── Init ── */
@@ -1074,7 +1245,16 @@ if (window.ethereum) {
   readProvider = new ethers.JsonRpcProvider(CFG.rpcUrl, { chainId: CFG.chainId, name: 'arc-testnet' }, { staticNetwork: true });
   await loadCreators();
 
-  if (window.ethereum && localStorage.getItem('influence_connected') === '1') {
-    await connectWallet(false);
+  // Privy manages its own session persistence — if a prior social-login
+  // session exists, mounting the widget restores it automatically and fires
+  // onPrivyAuthChange on its own; nothing to trigger explicitly here beyond
+  // registering the listener before that fires.
+  if (privyAvailable()) {
+    window.InfluenceAuth.onChange(onPrivyAuthChange);
+  }
+
+  const lastMethod = localStorage.getItem('influence_connected');
+  if (lastMethod === 'metamask' && window.ethereum) {
+    await connectViaMetaMask(false);
   }
 })();

@@ -1,11 +1,16 @@
 # Influence — Escrow Influencer Marketplace (Arc Testnet)
 
 A real, working dApp: brands lock native USDC in an on-chain escrow contract to hire
-creators; funds release when the brand approves (or automatically after 48h). No
-backend, no database, no seeded/demo data of any kind — creator profiles, deals,
-and reviews all live on-chain on [Arc Testnet](https://docs.arc.io), Circle's
-stablecoin-native L1. The marketplace shows only creators who have genuinely
-registered themselves; reviews only exist for deals that were genuinely paid out.
+creators; funds release when the brand approves (or automatically after 48h).
+Creator profiles, deals, and reviews all live on-chain on
+[Arc Testnet](https://docs.arc.io), Circle's stablecoin-native L1 — no seeded/demo
+data of any kind, the marketplace shows only creators who have genuinely registered
+themselves, and reviews only exist for deals that were genuinely paid out.
+
+There is now a small off-chain layer too (see "Backend" below), added specifically
+for two things a public blockchain shouldn't hold directly: email notifications and
+social login. Everything else — escrow, profiles, reviews, payments — is still 100%
+on-chain, unchanged from before.
 
 **Live app**: https://influence-orpin.vercel.app — auto-deployed from `main` via the
 `web/` directory (Vercel project root is set to `web`).
@@ -37,11 +42,44 @@ contracts/                 Hardhat project
   deployed.json             addresses + network info (safe to share, no secrets)
   .env                      DEPLOYER_PRIVATE_KEY, RPC URL, fee recipient — gitignored
 
-web/                        Static frontend, no build step
+web/                        Static frontend + a small Vercel serverless API layer
   index.html                 same visual design as the original prototype
-  app.js                     wallet connect + all contract reads/writes (ethers.js)
-  config.js                  generated: addresses + ABIs for the frontend
+  app.js                     wallet connect (MetaMask + Privy) + all contract reads/writes
+  config.js                  generated: contract addresses + ABIs for the frontend
   vendor/ethers.umd.min.js   vendored so the site has no CDN runtime dependency
+  logo.png                   rasterized from the sidebar SVG mark, for email templates
+                              (HTML email clients render inline SVG poorly/inconsistently)
+
+  auth-widget/                separate Vite+React project — the ONLY React code in
+                              this repo. Builds to ../auth-widget.js, a self-contained
+                              script the static page loads with a plain <script> tag.
+    src/main.jsx               wraps Privy's React SDK, exposes a plain imperative
+                                window.InfluenceAuth API (login/logout/getProvider/
+                                onChange) so vanilla-JS app.js never needs to be
+                                React-aware. See "Social login" below.
+
+  api/                        Vercel serverless functions (plain Node, no framework)
+    contact.js                 POST: save/update a creator's notification email,
+                                signature-verified — proves wallet ownership without
+                                a password/session system
+    notify/hired.js             POST: fired by the client right after createDeal()
+    notify/released.js          confirms — re-verifies against real chain state
+                                before sending, never trusts the client's claim
+    cron/notify-backstop.js    GET, Vercel Cron (daily): catches anything the
+                                instant client-triggered calls above missed
+
+  lib/                        shared server-side code
+    prisma.js                  cached Prisma client (serverless-safe singleton)
+    chain.js, chain-config.json, escrowAbi.json   server-side chain access —
+                                separate from web/config.js because Vercel functions
+                                can't read outside the project's root directory
+    notify.js                   tryNotify(dealId, kind) — the single choke point
+                                both notify/*.js and the cron backstop call through
+    emailTemplates.js           the actual email HTML/text, Influence-branded
+    rateLimit.js                in-memory per-instance limiter (same tradeoff as
+                                the sibling FinFlow project, see its README)
+
+  prisma/schema.prisma        3 tiny tables — see "Backend" below
 ```
 
 ## Contract design notes
@@ -102,17 +140,96 @@ web/                        Static frontend, no build step
   Arc testnet's rate-limited public RPC (see below): a "★ rating" badge on every
   grid card would mean fetching every creator's reviews just to render the list.
 
+## Backend
+
+Added for exactly two things that don't belong on a public, permanent, unencrypted
+ledger: **email addresses** and **email sending**. Nothing about escrow, profiles,
+deals, or reviews moved off-chain — `app.js` still talks to the three contracts
+directly for all of that, same as before.
+
+**Why this needed a backend at all**: an email notification requires (a) something
+that finds out a deal was created/released — can't be trusted to the client alone,
+since a closed browser tab would just silently skip the email — and (b) an
+email-provider API key, which can never live in client-side JS. Both need a server.
+
+**Data stored, off-chain, in Postgres** (`prisma/schema.prisma`):
+- `CreatorContact` — wallet address → notification email. Opt-in, settable/updatable
+  any time from "Join as Creator" regardless of on-chain registration status, proven
+  via a signed message (`buildContactMessage()` in `app.js`, verified with
+  `ethers.verifyMessage` in `api/contact.js`) — no password, no session cookie.
+- `NotificationLog` — one row per `(dealId, kind)`, unique constraint. This is the
+  actual dedupe mechanism: both the instant client-triggered call and the once-daily
+  cron backstop go through the same `tryNotify()`, and whichever gets there first
+  wins via this constraint — not an in-memory flag, so it's race-safe across
+  concurrent serverless invocations.
+- `SyncCursor` — one row, tracks how far the cron backstop has scanned.
+
+**Delivery has two paths, same as FinFlow's reconciliation pattern**: the instant
+path fires right after `tx.wait()` succeeds in `app.js` (near-real-time, the common
+case) and independently *re-derives* everything from `InfluenceEscrow.deals(dealId)`
+server-side rather than trusting the client's POST body — a malicious client can at
+worst trigger an early send of an email that would have gone out anyway, never a
+fabricated one. The cron backstop (`vercel.json`, once/day on the Hobby plan) scans
+`DealCreated`/`DealReleased` events from the last cursor position and catches
+anything that happened outside the app's own UI, or where the instant call failed
+for any reason.
+
+## Social login
+
+Twitter and email login, via [Privy](https://privy.io) — click "Connect Wallet" and
+choose "Continue with Twitter or Email" instead of MetaMask. Privy creates and
+manages a real embedded wallet behind that login; once authenticated, `app.js`
+wraps it in a standard `ethers.BrowserProvider` exactly like it wraps
+`window.ethereum` for MetaMask, so every downstream contract call is identical
+regardless of which path got you there — `activeAuthMethod` just tracks which one
+is live, for disconnect and for gating the MetaMask-only `accountsChanged`/
+`chainChanged` listeners.
+
+This lives in its own tiny Vite+React project (`auth-widget/`) that builds to a
+single self-contained `auth-widget.js`, because Privy's best-supported integration
+path is React and the rest of this site deliberately isn't. `src/main.jsx` is a
+thin, non-React-aware bridge: it exposes `window.InfluenceAuth` (`login`, `logout`,
+`getProvider`, `onChange`) so `app.js` never needs a JSX build step of its own.
+`window.InfluenceAuth` is always defined (even with `PRIVY_APP_ID` unset — see
+below) so `app.js` can safely probe it without knowing whether social login is
+configured.
+
+**Known tradeoff**: Privy's SDK is heavy — the built `auth-widget.js` is currently
+~4.2MB unminified / ~1.3MB gzipped, because it bundles WalletConnect and every
+connector type it supports, not just the embedded-wallet path this app actually
+uses. That's inherent to this whole category of provider (Dynamic and Web3Auth are
+comparably sized), not a bug — flagging it as a real page-weight cost, not hiding it.
+
+To change the Privy app ID: edit `auth-widget/.env` (`VITE_PRIVY_APP_ID=...`), then
+`cd auth-widget && npm run build` — this regenerates `../auth-widget.js`, which is
+committed (consumers of the static site don't run a build step, same reasoning as
+vendoring `ethers.umd.min.js`).
+
 ## Running locally
 
+**Frontend only**, no backend/API routes (fastest, matches how this project ran
+before the backend existed):
 ```bash
 cd web
 python3 -m http.server 8899
-# open http://localhost:8899
 ```
 
-That's it — it's a static site. Connect a MetaMask (or any EIP-1193 wallet)
-funded with testnet USDC from the faucet; the app will prompt you to add/switch
-to Arc Testnet if needed.
+**Full stack**, including `/api/*` routes (needed to test email capture, the notify
+triggers, or the cron backstop):
+```bash
+cd web
+npm install                      # installs Prisma/ethers/resend for the API layer
+vercel dev --listen 8899
+```
+`vercel dev` reads the same env vars as the live Vercel project (`DATABASE_URL`,
+`RESEND_API_KEY`, etc. — pull them with `vercel env pull` once they're set, or
+create a local `.env` from `.env.example`). Without a real `DATABASE_URL`, the
+static site and wallet flows work exactly as before; only `/api/contact` and
+`/api/notify/*` will fail (cleanly, with a JSON 500) at the database step.
+
+Either way: connect a MetaMask (or any EIP-1193 wallet) funded with testnet USDC
+from the faucet, or use "Continue with Twitter or Email"; the app will prompt you
+to add/switch to Arc Testnet if needed.
 
 ## Testing the full loop (including a real review)
 
