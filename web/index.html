@@ -729,7 +729,133 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
 
   .toast { left: 16px; right: 16px; transform: translateY(80px); white-space: normal; text-align: center; }
   .toast.show { transform: translateY(0); }
+
+  .support-contact-grid { grid-template-columns: 1fr; }
+  .support-icon-circle { width: 56px; height: 56px; }
+  .support-icon-circle svg, .support-icon-circle span { font-size: 26px; }
+  .complaint-result-actions { flex-direction: column; }
+  .faq-question { padding: 14px 16px; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SUPPORT & COMPLAINT CENTER
+   ══════════════════════════════════════════════════════════════ */
+.glass-card {
+  background: rgba(255,255,255,0.035);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+[data-theme="light"] .glass-card {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(20,16,28,0.08);
+  box-shadow: 0 8px 28px rgba(20,16,28,0.06);
+}
+
+.support-tabs-wrap { margin-bottom: 18px; }
+
+.support-contact-grid { display: none; }
+.support-panel { display: none; padding: 30px; margin-bottom: 24px; animation: supportFadeIn 0.35s ease; }
+.support-panel.active { display: block; }
+@keyframes supportFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.support-panel-inner { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.support-icon-circle {
+  width: 76px; height: 76px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s;
+}
+.support-icon-circle.x-brand { background: linear-gradient(150deg,#1a1a1a,#000); border: 1px solid rgba(255,255,255,0.12); }
+.support-icon-circle.mail-brand { background: linear-gradient(150deg,var(--violet),#FFB86B); }
+.support-panel:hover .support-icon-circle { transform: scale(1.06) rotate(-3deg); }
+.support-icon-circle.x-brand { box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.support-icon-circle.mail-brand { box-shadow: 0 8px 24px rgba(255,107,53,0.3); }
+.support-icon-circle span.x-glyph { font-size: 32px; color: #fff; font-weight: 700; line-height: 1; }
+.support-icon-circle svg { width: 34px; height: 34px; }
+
+.support-panel-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+.support-panel-handle { font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 10px; word-break: break-all; }
+.support-panel-btn {
+  padding: 12px 22px; border: none; border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.support-panel-btn:hover { transform: translateY(-1px); }
+.support-panel-btn.x-brand { background: linear-gradient(135deg,#2a2a2a,#000); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+.support-panel-btn.mail-brand { background: linear-gradient(135deg,var(--violet),#FFB86B); box-shadow: 0 4px 16px rgba(255,107,53,0.3); }
+
+.complaint-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.complaint-form-grid > .full-width { grid-column: 1 / -1; }
+@media (max-width: 640px) { .complaint-form-grid { grid-template-columns: 1fr; } }
+
+.file-drop-zone {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 22px;
+  text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 12px;
+  background: var(--navy2);
+}
+.file-drop-zone:hover, .file-drop-zone.drag-over { border-color: var(--violet); background: var(--violetbg); }
+.file-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.file-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 100px; padding: 5px 8px 5px 12px;
+  font-size: 11px; color: var(--text); max-width: 220px;
+  animation: chipPop 0.2s ease;
+}
+@keyframes chipPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+.file-chip span.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip button {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 12px; padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.file-chip button:hover { background: rgba(255,92,92,0.15); color: var(--red); }
+.file-note { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 18px; }
+
+.complaint-result-panel { display: none; padding: 28px; margin-bottom: 24px; }
+.complaint-result-panel.show { display: block; animation: supportFadeIn 0.4s ease; }
+.complaint-result-icon { font-size: 34px; margin-bottom: 10px; }
+.complaint-result-title { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 600; color: var(--mint); margin-bottom: 6px; }
+.complaint-result-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 18px; line-height: 1.6; }
+.complaint-summary-box {
+  background: var(--navy2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 18px; font-size: 12px; line-height: 1.8;
+  color: var(--text); white-space: pre-wrap; font-family: 'DM Mono', monospace;
+  max-height: 260px; overflow-y: auto;
+}
+.complaint-result-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.complaint-result-actions .support-panel-btn { flex: 1; min-width: 180px; justify-content: center; padding: 14px 22px; font-size: 13px; }
+
+.faq-item {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  margin-bottom: 10px; background: var(--surface); transition: border-color 0.15s;
+}
+.faq-item:hover { border-color: var(--border2); }
+.faq-question {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 18px; background: none; border: none; cursor: pointer; text-align: left;
+  font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 700; color: var(--text);
+}
+.faq-chevron { flex-shrink: 0; transition: transform 0.25s ease; color: var(--muted); font-size: 12px; }
+.faq-item.open .faq-chevron { transform: rotate(180deg); color: var(--violet); }
+.faq-answer-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s ease; }
+.faq-item.open .faq-answer-wrap { grid-template-rows: 1fr; }
+.faq-answer-inner { overflow: hidden; }
+.faq-answer { padding: 0 18px 16px; font-size: 12.5px; color: var(--muted); line-height: 1.65; }
+
+.skeleton {
+  background: linear-gradient(100deg, var(--navy2) 30%, var(--surface2) 50%, var(--navy2) 70%);
+  background-size: 200% 100%; animation: skeletonShimmer 1.3s ease-in-out infinite;
+}
+@keyframes skeletonShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.support-copy-btn { width: 100%; margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -768,6 +894,7 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
     <div class="nav-item" onclick="switchNav(this,'how')">⚡ <span>How it works</span></div>
     <div class="nav-item" onclick="switchNav(this,'register')">✦ <span>Join as Creator</span></div>
     <div class="nav-item" onclick="switchNav(this,'deals')">📋 <span style="flex:1">My Deals</span><span class="nav-badge" id="dealsNavBadge" style="display:none;">0</span></div>
+    <div class="nav-item" onclick="switchNav(this,'support')">🛟 <span>Support Center</span></div>
   </div>
   <div class="sidebar-bottom">
     <div class="arc-pill">
@@ -1033,6 +1160,149 @@ h1, h2, h3, .display-face { font-family: 'Fraunces', serif; font-optical-sizing:
 
       <div id="dealsContainer">
         <div class="deals-empty"><div class="emoji">🔌</div>Connect your wallet to see your deals.</div>
+      </div>
+
+    </div>
+
+    <div id="view-support" style="display:none;">
+
+      <div class="page-header">
+        <div>
+          <h1>Need Help?</h1>
+          <p>Our support team is available through X and Email. Choose your preferred contact method below.</p>
+        </div>
+      </div>
+
+      <div class="tab-bar support-tabs-wrap" role="tablist" aria-label="Support contact method">
+        <button class="tab-btn active" role="tab" aria-selected="true" id="supportTabXBtn" onclick="switchSupportTab('x')">𝕏 Contact on X</button>
+        <button class="tab-btn" role="tab" aria-selected="false" id="supportTabEmailBtn" onclick="switchSupportTab('email')">📧 Contact via Email</button>
+      </div>
+
+      <div class="support-panel glass-card active" id="supportPanelX" role="tabpanel" aria-labelledby="supportTabXBtn">
+        <div class="support-panel-inner">
+          <div class="support-icon-circle x-brand"><span class="x-glyph">𝕏</span></div>
+          <div style="flex:1;min-width:200px;">
+            <div class="support-panel-label">Official Influence X Account</div>
+            <div class="support-panel-handle">@Influence_Fi</div>
+            <button class="support-panel-btn x-brand" onclick="openXSupport()">𝕏 Message Us on X →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="support-panel glass-card" id="supportPanelEmail" role="tabpanel" aria-labelledby="supportTabEmailBtn">
+        <div class="support-panel-inner">
+          <div class="support-icon-circle mail-brand">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3" stroke="#fff" stroke-width="1.6"/><path d="M3.5 6.5L12 13L20.5 6.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="flex:1;min-width:200px;">
+            <div class="support-panel-label">Email Support</div>
+            <div class="support-panel-handle">influencefi.online@gmail.com</div>
+            <button class="support-panel-btn mail-brand" onclick="openEmailSupport()">📧 Send Email →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card" style="padding:28px;margin-bottom:24px;">
+        <div style="font-size:17px;font-weight:800;margin-bottom:4px;font-family:'Space Grotesk',sans-serif;">File a complaint or report an issue</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:22px;">We'll prepare a message with everything below — review it, then send it via X or email in one click.</div>
+
+        <div class="complaint-form-grid">
+          <div>
+            <label class="form-label" for="cName">Full name</label>
+            <input class="form-input" type="text" id="cName" placeholder="Your name" />
+          </div>
+          <div>
+            <label class="form-label" for="cEmail">Email address</label>
+            <input class="form-input" type="email" id="cEmail" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label class="form-label" for="cCampaign">Campaign / deal</label>
+            <input class="form-input" type="text" id="cCampaign" list="cCampaignList" placeholder="e.g. Deal #7, or describe it" />
+            <datalist id="cCampaignList"></datalist>
+          </div>
+          <div>
+            <label class="form-label" for="cCategory">Category</label>
+            <select class="form-select" id="cCategory">
+              <option value="">Select a category</option>
+              <option>Payment Issue</option>
+              <option>Campaign Issue</option>
+              <option>Creator Issue</option>
+              <option>Brand Issue</option>
+              <option>Fraud</option>
+              <option>Bug Report</option>
+              <option>Feature Request</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="full-width">
+            <label class="form-label" for="cSubject">Subject</label>
+            <input class="form-input" type="text" id="cSubject" placeholder="Brief summary of the issue" />
+          </div>
+          <div class="full-width">
+            <label class="form-label" for="cWallet">Wallet address</label>
+            <input class="form-input" type="text" id="cWallet" placeholder="0x..." style="font-family:'DM Mono',monospace;" />
+          </div>
+          <div class="full-width">
+            <label class="form-label" for="cDescription">Description</label>
+            <textarea class="brief-input" id="cDescription" placeholder="Describe what happened, when, and any deal/transaction details..." style="min-height:110px;"></textarea>
+          </div>
+          <div class="full-width">
+            <label class="form-label">Attachments</label>
+            <div class="file-drop-zone" id="fileDropZone" onclick="document.getElementById('cFiles').click()">
+              <div style="font-size:26px;margin-bottom:6px;opacity:0.6;">📎</div>
+              <div style="font-size:12.5px;color:var(--muted);">Click to select, or drag files here</div>
+              <div style="font-size:10.5px;color:var(--muted);margin-top:3px;opacity:0.7;">Images, screenshots, PDFs, videos, documents</div>
+            </div>
+            <input type="file" id="cFiles" multiple style="display:none;" accept="image/*,video/*,.pdf,.doc,.docx,.txt" />
+            <div class="file-chip-row" id="fileChipRow"></div>
+            <div class="file-note">📌 These aren't uploaded anywhere — X and email can't receive auto-attached files from a web page. Keep them handy to attach manually once your message opens.</div>
+          </div>
+        </div>
+
+        <button class="pay-btn" id="complaintSubmitBtn" onclick="submitComplaintForm()">📝 Prepare Complaint →</button>
+      </div>
+
+      <div class="glass-card complaint-result-panel" id="complaintResultPanel">
+        <div class="complaint-result-icon">✅</div>
+        <div class="complaint-result-title">Your complaint has been prepared successfully.</div>
+        <div class="complaint-result-sub">Review the summary below, then continue via X or email. X can't be pre-filled with a message — the copy button grabs everything so you can paste it into your DM.</div>
+        <div class="complaint-summary-box" id="complaintSummaryBox"></div>
+        <button class="btn-secondary-line support-copy-btn" onclick="copyComplaintToClipboard()">📋 Copy Complaint</button>
+        <div class="complaint-result-actions">
+          <button class="support-panel-btn x-brand" onclick="continueComplaintViaX()">𝕏 Continue with X</button>
+          <button class="support-panel-btn mail-brand" onclick="continueComplaintViaEmail()">📧 Continue with Email</button>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Frequently asked questions</div>
+
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">Why do payments/escrow releases take time?<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">Funds lock in the InfluenceEscrow smart contract the moment a brand hires a creator. Once the creator submits proof of the completed work, the brand has 48 hours to review and approve — releasing 99% to the creator and 1% platform fee instantly, on-chain. If the brand doesn't respond in that window, anyone can trigger an automatic release, so a creator is never left waiting indefinitely on an unresponsive brand.</div></div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">What happens if there's a campaign dispute?<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">Most disputes are already handled by the contract itself: a brand can cancel and reclaim funds any time before the creator submits proof, and can only release funds after reviewing what was submitted. For disagreements that need human judgment — like whether delivered work matches the brief — file a complaint above with the deal ID, or message us directly. Reviews left on a deal are public and on-chain, and factor into a creator's reputation.</div></div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">How does account/creator verification work?<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">Listing a creator profile is fully self-serve on-chain via "Join as Creator" — anyone can do it. The "✓ Verified" badge shown on some profiles is granted by the Influence team after manually confirming a creator's identity and social presence. Reach out via Support to request verification for your profile.</div></div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">How does creator onboarding work?<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">Connect a wallet (MetaMask, or Twitter/Email via social login), go to "Join as Creator," fill in your profile — niche, rate, socials — and submit. That writes your profile directly to the on-chain CreatorRegistry. No approval step needed before you can start receiving hire offers.</div></div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">How does brand onboarding work?<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">No signup required for brands. Connect a wallet, browse creators in the marketplace, and click "Hire" on any profile — that locks USDC in escrow and starts the deal immediately.</div></div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">Why am I not receiving email notifications?<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">Notification emails (hired, funds released) only go out if you've added a notification email under "Join as Creator" → Notification email, confirmed with a wallet signature. If you registered a profile but never added an email, add one any time — it doesn't require re-registering your profile.</div></div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">I don't see a deal or payment I'm expecting.<span class="faq-chevron">▾</span></button>
+        <div class="faq-answer-wrap"><div class="faq-answer-inner"><div class="faq-answer">Every deal lives in escrow on Arc Testnet and is publicly verifiable — check the transaction link in "My Deals," or search your wallet address on Arcscan. Since this runs on testnet infrastructure, also confirm your wallet is connected to Arc Testnet (chain ID 5042002) and not a different network.</div></div></div>
       </div>
 
     </div>

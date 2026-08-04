@@ -3,3 +3,10 @@ node_modules
 .env
 .env.local
 
+.env*
+
+# Agent-skill helper files auto-installed by `vercel integration add neon` —
+# local dev tooling metadata, not application code, regenerable on demand.
+.agents/
+.claude/
+skills-lock.json

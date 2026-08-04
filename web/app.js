@@ -248,18 +248,19 @@ function switchNav(el, viewId) {
 function switchNavById(viewId) {
   document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
   const items = document.querySelectorAll('.nav-item');
-  const map = { marketplace: 0, how: 1, register: 2, deals: 3 };
+  const map = { marketplace: 0, how: 1, register: 2, deals: 3, support: 4 };
   if (items[map[viewId]]) items[map[viewId]].classList.add('active');
   activateView(viewId);
 }
 function activateView(viewId) {
-  ['marketplace', 'how', 'register', 'deals'].forEach((id) => {
+  ['marketplace', 'how', 'register', 'deals', 'support'].forEach((id) => {
     const v = document.getElementById('view-' + id);
     if (v) v.style.display = id === viewId ? 'block' : 'none';
   });
   closeSidebar();
   window.scrollTo(0, 0);
   if (viewId === 'deals') loadMyDeals();
+  if (viewId === 'support') prefillSupportCenter();
 }
 
 /* ── Wallet connection ──────────────────────────────────────────
@@ -1218,6 +1219,201 @@ async function cancelDealAction(dealId) {
   } catch (err) {
     showToast('⚠️', txErrorMessage(err), true);
   }
+}
+
+/* ── Support & Complaint Center ──────────────────────────────────
+   Entirely client-side by design: X can't be pre-filled with a DM's
+   contents via URL (no such public API), and a mailto: link can't carry
+   file attachments — there's no backend here that could receive them
+   either. So "prepare a complaint" means: build a clean text summary,
+   let the user copy it (for X) or open it pre-filled (for email), and be
+   upfront that any selected files need to be attached by hand. */
+const SUPPORT_X_URL = 'https://x.com/influence_fi';
+const SUPPORT_EMAIL = 'influencefi.online@gmail.com';
+
+let selectedComplaintFiles = [];
+let lastComplaintText = '';
+
+function switchSupportTab(tab) {
+  document.getElementById('supportTabXBtn').classList.toggle('active', tab === 'x');
+  document.getElementById('supportTabXBtn').setAttribute('aria-selected', String(tab === 'x'));
+  document.getElementById('supportTabEmailBtn').classList.toggle('active', tab === 'email');
+  document.getElementById('supportTabEmailBtn').setAttribute('aria-selected', String(tab === 'email'));
+  document.getElementById('supportPanelX').classList.toggle('active', tab === 'x');
+  document.getElementById('supportPanelEmail').classList.toggle('active', tab === 'email');
+}
+
+function openXSupport() {
+  window.open(SUPPORT_X_URL, '_blank', 'noopener');
+  showToast('𝕏', 'Redirecting to X…');
+}
+
+function quickEmailBody() {
+  const walletLine = userAddress ? userAddress : '';
+  return `Hello Influence Team,\n\nIssue Type: \n\nCampaign: \n\nWallet Address: ${walletLine}\n\nDescription: \n\nThank you.`;
+}
+
+function openEmailSupport() {
+  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Influence Support Request')}&body=${encodeURIComponent(quickEmailBody())}`;
+  window.location.href = url;
+  showToast('📧', "Opening your email client…");
+}
+
+/* ── Prefill (real state only — wallet address / registered creator name
+   / your own recent deals for the campaign suggestions, nothing fabricated) ── */
+function prefillSupportCenter() {
+  const walletEl = document.getElementById('cWallet');
+  if (userAddress && !walletEl.value) walletEl.value = userAddress;
+
+  const nameEl = document.getElementById('cName');
+  if (userAddress && !nameEl.value) {
+    const c = creatorsMap.get(userAddress.toLowerCase());
+    if (c) nameEl.value = c.name;
+  }
+
+  const list = document.getElementById('cCampaignList');
+  if (dealsCache.length) {
+    list.innerHTML = dealsCache
+      .map((d) => `<option value="Deal #${d.id}">${escapeHtml(d.brief.slice(0, 60))}</option>`)
+      .join('');
+  }
+}
+
+/* ── File picker (display-only — see note at top of this section) ── */
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('cFiles');
+  const zone = document.getElementById('fileDropZone');
+  if (!input || !zone) return;
+
+  input.addEventListener('change', () => handleFileSelect(input.files));
+
+  ['dragover', 'dragenter'].forEach((evt) =>
+    zone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    })
+  );
+  ['dragleave', 'drop'].forEach((evt) =>
+    zone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+    })
+  );
+  zone.addEventListener('drop', (e) => {
+    if (e.dataTransfer?.files?.length) handleFileSelect(e.dataTransfer.files);
+  });
+});
+
+function handleFileSelect(fileList) {
+  for (const f of fileList) selectedComplaintFiles.push(f);
+  renderFileChips();
+}
+
+function removeComplaintFile(index) {
+  selectedComplaintFiles.splice(index, 1);
+  renderFileChips();
+}
+
+function renderFileChips() {
+  document.getElementById('fileChipRow').innerHTML = selectedComplaintFiles
+    .map((f, i) => `<div class="file-chip"><span class="name">📎 ${escapeHtml(f.name)}</span><button type="button" onclick="removeComplaintFile(${i})" aria-label="Remove ${escapeHtml(f.name)}">✕</button></div>`)
+    .join('');
+}
+
+/* ── Complaint form ── */
+function formatComplaintText(c) {
+  const lines = [
+    'INFLUENCE SUPPORT COMPLAINT',
+    '─'.repeat(32),
+    `Name: ${c.name}`,
+    `Email: ${c.email}`,
+    `Category: ${c.category}`,
+    `Campaign: ${c.campaign || '—'}`,
+    `Wallet Address: ${c.wallet || '—'}`,
+    `Subject: ${c.subject}`,
+    '',
+    'Description:',
+    c.description,
+  ];
+  if (c.fileNames.length) {
+    lines.push('', `Attachments (attach manually): ${c.fileNames.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+function submitComplaintForm() {
+  const name = document.getElementById('cName').value.trim();
+  const email = document.getElementById('cEmail').value.trim();
+  const campaign = document.getElementById('cCampaign').value.trim();
+  const category = document.getElementById('cCategory').value;
+  const subject = document.getElementById('cSubject').value.trim();
+  const wallet = document.getElementById('cWallet').value.trim();
+  const description = document.getElementById('cDescription').value.trim();
+
+  if (!name || !email || !category || !subject || !description) {
+    showToast('⚠️', 'Please fill in name, email, category, subject, and description.', true);
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('⚠️', 'Please enter a valid email address.', true);
+    return;
+  }
+
+  const complaint = { name, email, campaign, category, subject, wallet, description, fileNames: selectedComplaintFiles.map((f) => f.name) };
+  lastComplaintText = formatComplaintText(complaint);
+  window._lastComplaint = complaint;
+
+  document.getElementById('complaintSummaryBox').textContent = lastComplaintText;
+  const panel = document.getElementById('complaintResultPanel');
+  panel.classList.add('show');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('✅', 'Your complaint has been prepared successfully.');
+}
+
+async function copyComplaintToClipboard() {
+  if (!lastComplaintText) return;
+  try {
+    await navigator.clipboard.writeText(lastComplaintText);
+    showToast('📋', 'Complaint copied to clipboard.');
+  } catch (err) {
+    showToast('⚠️', "Couldn't copy automatically — select the text above and copy it manually.", true);
+  }
+}
+
+function continueComplaintViaX() {
+  window.open(SUPPORT_X_URL, '_blank', 'noopener');
+  showToast('𝕏', 'Redirecting to X — paste your copied complaint into the message.');
+}
+
+function continueComplaintViaEmail() {
+  const c = window._lastComplaint;
+  if (!c) return;
+  const body = [
+    'Hello Influence Team,',
+    '',
+    `Issue Type: ${c.category}`,
+    `Campaign: ${c.campaign || ''}`,
+    `Wallet Address: ${c.wallet || ''}`,
+    '',
+    `Description:`,
+    c.description,
+    '',
+    `Submitted by: ${c.name} (${c.email})`,
+    c.fileNames.length ? `Attachments to attach manually: ${c.fileNames.join(', ')}` : '',
+    '',
+    'Thank you.',
+  ].join('\n');
+  const subject = `Influence Support Request — ${c.subject}`;
+  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = url;
+  showToast('📧', 'Opening your email client…');
+}
+
+/* ── FAQ accordion ── */
+function toggleFaq(btn) {
+  const item = btn.closest('.faq-item');
+  const isOpen = item.classList.toggle('open');
+  btn.setAttribute('aria-expanded', String(isOpen));
 }
 
 /* ── Wallet event listeners ── */

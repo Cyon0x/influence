@@ -205,6 +205,24 @@ To change the Privy app ID: edit `auth-widget/.env` (`VITE_PRIVY_APP_ID=...`), t
 committed (consumers of the static site don't run a build step, same reasoning as
 vendoring `ethers.umd.min.js`).
 
+## Support Center
+
+Sidebar → Support Center. Entirely client-side, no backend involved — two real
+platform constraints shaped how it works, worth knowing before changing it:
+
+- **X can't be pre-filled with a DM's contents via URL** — there's no public API for
+  that, only web intents for composing a public tweet. So "Message Us on X" just
+  opens the profile; for the complaint form, the flow is copy the prepared summary
+  (`copyComplaintToClipboard()`), then paste it into a DM after redirecting.
+- **A `mailto:` link can't carry file attachments**, and there's nothing here that
+  could receive an upload anyway. The file picker (`handleFileSelect()`) is
+  genuinely just a picker — it lists selected filenames in the generated message so
+  you remember to attach them yourself, it never uploads or stores them anywhere.
+  Said explicitly in the UI (`.file-note`), not left implicit.
+
+`SUPPORT_EMAIL`/`SUPPORT_X_URL` are constants at the top of the Support Center
+section in `app.js`.
+
 ## Running locally
 
 **Frontend only**, no backend/API routes (fastest, matches how this project ran
