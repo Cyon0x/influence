@@ -174,6 +174,29 @@ fabricated one. The cron backstop (`vercel.json`, once/day on the Hobby plan) sc
 anything that happened outside the app's own UI, or where the instant call failed
 for any reason.
 
+### ⚠️ Known limitation: emails don't actually deliver to real creators yet
+
+`NOTIFY_FROM_EMAIL` is currently the shared, unverified `onboarding@resend.dev`
+sender (Resend has no verified domain configured for this project). Confirmed by
+direct testing against the live API key: Resend rejects sending to any real-looking
+address from this sender —
+
+```json
+{"statusCode":422,"name":"validation_error","message":"Invalid `to` field. Please use our testing email address instead of domains like `example.com`."}
+```
+
+So right now, a real creator adding a real email under "Join as Creator" will never
+actually receive a "you've been hired" or "funds released" email — the whole
+pipeline (contact capture, signature verification, instant trigger, cron backstop,
+templates) is built and correct, but delivery itself is blocked by Resend's
+anti-abuse policy for unverified senders, not by anything in this codebase. This
+was a deliberate call to leave as-is for now rather than block on getting a domain
+— **don't mistake "no errors" for "creators are getting emailed," they aren't.**
+
+To fix: get a domain, verify it in the Resend dashboard (adds SPF/DKIM DNS
+records), then update `NOTIFY_FROM_EMAIL` in Vercel's project env vars to
+`Influence <notify@yourdomain.com>` (or similar) — no code changes needed.
+
 ## Social login
 
 Twitter and email login, via [Privy](https://privy.io) — click "Connect Wallet" and
