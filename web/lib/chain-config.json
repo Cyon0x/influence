@@ -1,6 +1,6 @@
 {
   "chainId": 5042002,
-  "rpcUrl": "https://rpc.testnet.arc.network",
+  "rpcUrl": "https://rpc.blockdaemon.testnet.arc.io",
   "explorer": "https://testnet.arcscan.app",
   "escrowAddress": "0x0b10DF073A498c5c1CEead9C614081C2834728d4"
 }

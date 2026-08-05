@@ -1,10 +1,33 @@
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { defineChain } from 'viem';
 import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth';
 
 // Baked in at build time (Privy app IDs are meant to be public/client-side,
 // not a secret) — see auth-widget/.env, set VITE_PRIVY_APP_ID and rebuild.
 const APP_ID = import.meta.env.VITE_PRIVY_APP_ID;
+
+// Arc testnet isn't one of viem's built-in chains, so Privy's embedded
+// wallet has no idea it exists unless it's explicitly defined and passed
+// as both defaultChain and (within) supportedChains below — without this,
+// the embedded wallet has no chain to switch to, silently defeating the
+// auto-network-switch this config exists for. Reads from window.INFLUENCE_CONFIG
+// (loaded by config.js, guaranteed to run before this script — see index.html's
+// script order) rather than hardcoding, so it can never drift out of sync with
+// the rest of the app's contract/RPC config.
+const CFG = window.INFLUENCE_CONFIG || {};
+const arcTestnet = defineChain({
+  id: CFG.chainId || 5042002,
+  name: 'Arc Testnet',
+  network: 'arc-testnet',
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+  rpcUrls: {
+    default: { http: [CFG.rpcUrl || 'https://rpc.blockdaemon.testnet.arc.io'] },
+  },
+  blockExplorers: {
+    default: { name: 'Arcscan', url: CFG.explorer || 'https://testnet.arcscan.app' },
+  },
+});
 
 // If Privy never becomes ready for any reason (misconfigured App ID, network
 // failure, allowed-origins mismatch, an outage on their end), the widget
@@ -119,6 +142,8 @@ if (!APP_ID) {
         config={{
           loginMethods: ['twitter', 'email'],
           embeddedWallets: { createOnLogin: 'users-without-wallets' },
+          defaultChain: arcTestnet,
+          supportedChains: [arcTestnet],
           appearance: {
             theme: 'dark',
             accentColor: '#FF6B35',

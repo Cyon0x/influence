@@ -72,6 +72,27 @@ let currentDealFilter = 'all';
 let dealsCache = [];
 let reviewRatingState = {}; // dealId -> selected stars for the "leave a review" form (default 5)
 
+/* Reading through a single RPC leaves the whole marketplace dead if that one
+   provider ever breaks — which happened in production (Arc's primary RPC
+   started failing CORS preflight for all browser requests while still
+   working fine from curl/servers, since CORS isn't enforced there). A
+   FallbackProvider with quorum:1 tries the primary first and only spends
+   the ~3s stall timeout falling through to the backup on genuine failure —
+   it doesn't double every read against both providers on the happy path. */
+function buildReadProvider() {
+  const primary = new ethers.JsonRpcProvider(CFG.rpcUrl, { chainId: CFG.chainId, name: 'arc-testnet' }, { staticNetwork: true });
+  if (!CFG.rpcUrlFallback) return primary;
+  const fallback = new ethers.JsonRpcProvider(CFG.rpcUrlFallback, { chainId: CFG.chainId, name: 'arc-testnet' }, { staticNetwork: true });
+  return new ethers.FallbackProvider(
+    [
+      { provider: primary, priority: 1, weight: 1, stallTimeout: 3000 },
+      { provider: fallback, priority: 2, weight: 1, stallTimeout: 3000 },
+    ],
+    undefined,
+    { quorum: 1 }
+  );
+}
+
 /* ── Contracts ── */
 function registryRead() { return new ethers.Contract(CFG.registryAddress, CFG.registryAbi, readProvider); }
 function escrowReadC() { return new ethers.Contract(CFG.escrowAddress, CFG.escrowAbi, readProvider); }
@@ -328,6 +349,12 @@ async function connectViaMetaMask(interactive) {
       return;
     }
 
+    // Ensure the correct network *before* constructing the ethers provider —
+    // ethers.BrowserProvider treats a chain change observed mid-session as a
+    // safety error ("network changed"), not something to swallow. Doing the
+    // switch first means it only ever sees the already-correct network.
+    const onArcNetwork = await ensureArcNetworkRaw(true);
+
     browserProvider = new ethers.BrowserProvider(window.ethereum);
     signer = await browserProvider.getSigner();
     userAddress = accounts[0];
@@ -336,6 +363,7 @@ async function connectViaMetaMask(interactive) {
 
     const network = await browserProvider.getNetwork();
     updateNetworkBanner(Number(network.chainId));
+    if (onArcNetwork && Number(network.chainId) === CFG.chainId) showToast('🔗', 'Connected to Arc Testnet.');
 
     updateWalletUI();
     if (document.getElementById('view-deals').style.display !== 'none') loadMyDeals();
@@ -455,12 +483,31 @@ function updateNetworkBanner(chainId) {
   else banner.classList.remove('show');
 }
 
-async function switchToArcTestnet() {
+/* Talks to window.ethereum only — deliberately never touches browserProvider
+   or ethers at all, so it's safe to call before those exist (the connect
+   flow) or after (the manual banner button). Returns true once the wallet
+   is confirmed on Arc Testnet, false otherwise.
+
+   silent=true is used right after a fresh connect, so the app doesn't nag
+   with an error toast if the user simply dismisses the switch/add prompt —
+   the persistent "Wrong network" banner (updateNetworkBanner) is the calm
+   fallback either way, so declining here never leaves the user stuck with
+   no way to fix it. silent=false is the manual "Switch network" banner
+   button, where showing what went wrong is the whole point. */
+async function ensureArcNetworkRaw(silent = false) {
+  try {
+    const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (typeof currentChainId === 'string' && currentChainId.toLowerCase() === CFG.chainIdHex.toLowerCase()) return true;
+  } catch (err) {
+    // Fall through and attempt the switch anyway.
+  }
+
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: CFG.chainIdHex }],
     });
+    return true;
   } catch (switchErr) {
     if (switchErr.code === 4902) {
       try {
@@ -470,21 +517,32 @@ async function switchToArcTestnet() {
             chainId: CFG.chainIdHex,
             chainName: 'Arc Testnet',
             nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-            rpcUrls: [CFG.rpcUrl],
+            rpcUrls: [CFG.rpcUrl, CFG.rpcUrlFallback].filter(Boolean),
             blockExplorerUrls: [CFG.explorer],
           }],
         });
+        return true;
       } catch (addErr) {
-        showToast('⚠️', txErrorMessage(addErr), true);
-        return;
+        if (!silent) showToast('⚠️', txErrorMessage(addErr), true);
+        return false;
       }
-    } else {
-      showToast('⚠️', txErrorMessage(switchErr), true);
-      return;
     }
+    if (!silent) showToast('⚠️', txErrorMessage(switchErr), true);
+    return false;
   }
+}
+
+/* Manual "Switch network" banner button — the user is already connected, so
+   an existing browserProvider/signer are live and must be rebuilt after a
+   successful switch (same "network changed" reasoning as connectViaMetaMask). */
+async function switchToArcTestnet() {
+  const ok = await ensureArcNetworkRaw(false);
+  if (!ok) return;
+  browserProvider = new ethers.BrowserProvider(window.ethereum);
+  signer = await browserProvider.getSigner();
   const network = await browserProvider.getNetwork();
   updateNetworkBanner(Number(network.chainId));
+  if (Number(network.chainId) === CFG.chainId) showToast('🔗', 'Connected to Arc Testnet.');
 }
 
 function requireReadyToTransact() {
@@ -1438,7 +1496,7 @@ if (window.ethereum) {
 
 /* ── Init ── */
 (async function init() {
-  readProvider = new ethers.JsonRpcProvider(CFG.rpcUrl, { chainId: CFG.chainId, name: 'arc-testnet' }, { staticNetwork: true });
+  readProvider = buildReadProvider();
   await loadCreators();
 
   // Privy manages its own session persistence — if a prior social-login

@@ -2,7 +2,8 @@
 window.INFLUENCE_CONFIG = {
   chainId: 5042002,
   chainIdHex: '0x' + (5042002).toString(16),
-  rpcUrl: "https://rpc.testnet.arc.network",
+  rpcUrl: "https://rpc.blockdaemon.testnet.arc.io",
+  rpcUrlFallback: 'https://arc-testnet.drpc.org',
   explorer: "https://testnet.arcscan.app",
   registryAddress: "0x4B156cAE6D0D1aDd34eCBE636C588Ffb79112A4F",
   escrowAddress: "0x0b10DF073A498c5c1CEead9C614081C2834728d4",
