@@ -1499,6 +1499,14 @@ if (window.ethereum) {
   readProvider = buildReadProvider();
   await loadCreators();
 
+  // Lets external links (the landing page's CTAs, the email notification
+  // templates) deep-link straight to a specific view — e.g. app.html#deals
+  // — rather than always landing on the marketplace regardless of intent.
+  // Purely additive: doesn't change what any nav item or button does.
+  const validViews = ['marketplace', 'how', 'register', 'deals', 'support'];
+  const initialView = (location.hash || '').replace('#', '');
+  if (validViews.includes(initialView)) switchNavById(initialView);
+
   // Privy manages its own session persistence — if a prior social-login
   // session exists, mounting the widget restores it automatically and fires
   // onPrivyAuthChange on its own; nothing to trigger explicitly here beyond

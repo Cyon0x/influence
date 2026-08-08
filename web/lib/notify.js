@@ -65,7 +65,7 @@ async function tryNotify(dealId, kind, opts = {}) {
     throw err;
   }
 
-  const dealsUrl = `${SITE_URL}/`;
+  const dealsUrl = `${SITE_URL}/app.html#deals`;
   const explorerTxUrl = txHash ? `${chainConfig.explorer}/tx/${txHash}` : null;
 
   let templateResult;

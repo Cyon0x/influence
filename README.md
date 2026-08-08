@@ -12,8 +12,9 @@ for two things a public blockchain shouldn't hold directly: email notifications 
 social login. Everything else — escrow, profiles, reviews, payments — is still 100%
 on-chain, unchanged from before.
 
-**Live app**: https://influence-orpin.vercel.app — auto-deployed from `main` via the
-`web/` directory (Vercel project root is set to `web`).
+**Live**: https://influence-orpin.vercel.app — auto-deployed from `main` via the
+`web/` directory (Vercel project root is set to `web`). Root (`/`) is the marketing
+landing page; the app itself is at `/app.html` (linked from every CTA).
 
 ## Live deployment
 
@@ -43,12 +44,26 @@ contracts/                 Hardhat project
   .env                      DEPLOYER_PRIVATE_KEY, RPC URL, fee recipient — gitignored
 
 web/                        Static frontend + a small Vercel serverless API layer
-  index.html                 same visual design as the original prototype
-  app.js                     wallet connect (MetaMask + Privy) + all contract reads/writes
+  index.html                 marketing landing page (new) — hero, live on-chain
+                              stats/ticker, escrow mechanism walkthrough, FAQ; every
+                              CTA deep-links into app.html via a URL hash
+  landing.js                 landing page's own script — read-only chain calls
+                              (creator count + roster for the ticker) plus UI wiring
+                              (theme, mobile nav, FAQ accordion, Brand/Creator toggle).
+                              Deliberately separate from app.js: no wallet/deal logic
+  app.html                   the actual app (unchanged; this used to be index.html —
+                              renamed via `git mv` to make room for the landing page)
+  app.js                     wallet connect (MetaMask + Privy) + all contract reads/
+                              writes. Reads a `#marketplace`/`#how`/`#register`/
+                              `#deals`/`#support` URL hash on load so external links
+                              (the landing page, email notifications) can deep-link
+                              straight to a view instead of always landing on the
+                              marketplace
   config.js                  generated: contract addresses + ABIs for the frontend
   vendor/ethers.umd.min.js   vendored so the site has no CDN runtime dependency
   logo.png                   rasterized from the sidebar SVG mark, for email templates
                               (HTML email clients render inline SVG poorly/inconsistently)
+  favicon-32.png, apple-touch-icon.png   same source mark, rasterized at browser-tab sizes
 
   auth-widget/                separate Vite+React project — the ONLY React code in
                               this repo. Builds to ../auth-widget.js, a self-contained
@@ -271,6 +286,9 @@ static site and wallet flows work exactly as before; only `/api/contact` and
 Either way: connect a MetaMask (or any EIP-1193 wallet) funded with testnet USDC
 from the faucet, or use "Continue with Twitter or Email"; the app will prompt you
 to add/switch to Arc Testnet if needed.
+
+Visiting `http://localhost:8899/` loads the landing page; the app itself is at
+`http://localhost:8899/app.html`.
 
 ## Testing the full loop (including a real review)
 
